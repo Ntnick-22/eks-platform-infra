@@ -1,8 +1,12 @@
 .terraform/
 *.tfstate
 *.tfstate.*
-.tfplan
+*.tfplan
+tfplan
 crash.log
+*.auto.tfvars
+# Lock files are committed for root layers only, not for child modules
+modules/**/.terraform.lock.hcl
 *.bkp
 *.log
 notes/
