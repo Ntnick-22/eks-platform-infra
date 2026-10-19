@@ -9,4 +9,7 @@ locals {
 
   # OIDC 'sub' GitHub sends for workflows triggered by pull_request
   plan_role_subjects = ["${var.github_oidc_sub_prefix}:pull_request"]
+
+  # backend => myeks/backend
+  ecr_repository_names = { for r in var.ecr_repositories : r => "${var.project}/${r}" }
 }

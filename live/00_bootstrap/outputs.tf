@@ -12,3 +12,8 @@ output "gha_plan_role_arn" {
   description = "Role the plan workflow assumes (store as GitHub secret AWS_PLAN_ROLE_ARN)"
   value       = module.gha_plan_role.arn
 }
+
+output "ecr_repository_urls" {
+  description = "Image repository URLs by app component (the app repo's CI pushes here)"
+  value       = { for k, m in module.ecr : k => m.repository_url }
+}
