@@ -31,13 +31,13 @@ variable "budget_alert_emails" {
   sensitive   = true
 }
 
-variable "github_repo" {
-  description = "GitHub repo (owner/name) whose workflows may use the CI roles"
+variable "github_oidc_sub_prefix" {
+  description = "Repo's OIDC sub prefix (gh api repos/<owner>/<repo>/actions/oidc/customization/sub -> sub_claim_prefix)"
   type        = string
 
   validation {
-    condition     = can(regex("^[A-Za-z0-9-]+/[A-Za-z0-9._-]+$", var.github_repo))
-    error_message = "github_repo must look like owner/name."
+    condition     = startswith(var.github_oidc_sub_prefix, "repo:") && !strcontains(var.github_oidc_sub_prefix, "*")
+    error_message = "github_oidc_sub_prefix must start with 'repo:' and contain no wildcard."
   }
 }
 
