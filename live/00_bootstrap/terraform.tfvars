@@ -4,5 +4,6 @@ name_prefix      = "ntnick-myeks"
 budget_limit_usd = 30
 # Immutable subject (owner/repo IDs) - from: gh api repos/Ntnick-22/eks-platform-infra/actions/oidc/customization/sub
 github_oidc_sub_prefix = "repo:Ntnick-22@190462806/eks-platform-infra@1421296705"
+ecr_repositories       = ["backend", "frontend"]
 
 # budget_alert_emails comes from TF_VAR_budget_alert_emails / GitHub secret, never from this file.

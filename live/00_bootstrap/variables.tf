@@ -41,6 +41,16 @@ variable "github_oidc_sub_prefix" {
   }
 }
 
+variable "ecr_repositories" {
+  description = "App components that get an image repository (named <project>/<component>)"
+  type        = list(string)
+
+  validation {
+    condition     = length(var.ecr_repositories) == length(distinct(var.ecr_repositories))
+    error_message = "ecr_repositories must not contain duplicates."
+  }
+}
+
 # ── Optional ──────────────────────────────────────────────────────────────────
 
 variable "tfstate_noncurrent_version_days" {

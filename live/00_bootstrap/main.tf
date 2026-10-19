@@ -24,3 +24,10 @@ module "gha_plan_role" {
     tfstate-lock = data.aws_iam_policy_document.tfstate_lock.json
   }
 }
+
+module "ecr" {
+  source   = "../../modules/ecr_repository"
+  for_each = local.ecr_repository_names
+
+  name = each.value
+}
