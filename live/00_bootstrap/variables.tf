@@ -31,6 +31,16 @@ variable "budget_alert_emails" {
   sensitive   = true
 }
 
+variable "github_repo" {
+  description = "GitHub repo (owner/name) whose workflows may use the CI roles"
+  type        = string
+
+  validation {
+    condition     = can(regex("^[A-Za-z0-9-]+/[A-Za-z0-9._-]+$", var.github_repo))
+    error_message = "github_repo must look like owner/name."
+  }
+}
+
 # ── Optional ──────────────────────────────────────────────────────────────────
 
 variable "tfstate_noncurrent_version_days" {
