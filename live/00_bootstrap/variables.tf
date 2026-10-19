@@ -31,6 +31,16 @@ variable "budget_alert_emails" {
   sensitive   = true
 }
 
+variable "github_oidc_sub_prefix" {
+  description = "Repo's OIDC sub prefix (gh api repos/<owner>/<repo>/actions/oidc/customization/sub -> sub_claim_prefix)"
+  type        = string
+
+  validation {
+    condition     = startswith(var.github_oidc_sub_prefix, "repo:") && !strcontains(var.github_oidc_sub_prefix, "*")
+    error_message = "github_oidc_sub_prefix must start with 'repo:' and contain no wildcard."
+  }
+}
+
 # ── Optional ──────────────────────────────────────────────────────────────────
 
 variable "tfstate_noncurrent_version_days" {
