@@ -13,7 +13,7 @@ eks-platform-infra/
 │   ├── github_oidc_role/       IAM role trusted only for one repo/branch/environment
 │   ├── ecr_repository/         immutable tags, scan on push, lifecycle policy
 │   ├── ssm_contract/           publishes a layer's outputs to SSM Parameter Store
-│   ├── network/                wraps terraform-aws-modules/vpc + fck-nat + S3 gateway endpoint
+│   ├── network/                wraps terraform-aws-modules/vpc + NAT instance + S3 gateway endpoint
 │   ├── eks_cluster/            wraps terraform-aws-modules/eks + add-ons + Pod Identity
 │   └── rds_postgres/           (Phase 1, 03_data)
 ├── live/                       ← ROOT modules: thin wiring, one state each, applied in order
@@ -145,7 +145,7 @@ pre-commit runs `gitleaks` and `trivy config`.
 | Layer | Lifecycle | Contents |
 |---|---|---|
 | `00_bootstrap` | Persistent | State bucket, Budget, GitHub OIDC roles, ECR, ACM, Cognito, Vault KMS key, Loki bucket, CloudTrail |
-| `01_network` | Daily | VPC, subnets, fck-nat, S3 gateway endpoint |
+| `01_network` | Daily | VPC, subnets, NAT instance, S3 gateway endpoint |
 | `02_eks` | Daily | EKS, node group, add-ons, access entries, Pod Identity, Argo CD bootstrap |
 | `03_data` | Daily | RDS PostgreSQL |
 | `04_vault` | Daily | Vault configuration (Terraform Vault provider) |
