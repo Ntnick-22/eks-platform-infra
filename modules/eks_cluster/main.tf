@@ -135,6 +135,7 @@ module "ebs_csi_role" {
 
   name                     = "${var.name}-ebs-csi"
   permissions_boundary_arn = var.permissions_boundary_arn
-  managed_policy_arns      = ["${local.managed_policy_prefix}/AmazonEBSCSIDriverPolicy"]
+  # Note the path: this AWS-managed policy lives under service-role/, unlike the EKS ones
+  managed_policy_arns = ["${local.managed_policy_prefix}/service-role/AmazonEBSCSIDriverPolicy"]
   # No association here: the EKS add-on creates it (pod_identity_association above)
 }
