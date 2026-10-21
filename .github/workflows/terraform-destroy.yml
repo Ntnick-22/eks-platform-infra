@@ -1,0 +1,71 @@
+name: terraform-destroy
+
+on:
+  schedule:
+    - cron: "0 22 * * *" # 22:00 UTC safety net: nothing daily survives the night (ADR-0016)
+  workflow_dispatch: # manual tear-down: Actions → terraform-destroy → Run workflow
+
+permissions:
+  contents: read
+  id-token: write
+
+# Same group as terraform-apply: a destroy never runs in the middle of an apply, and vice versa
+concurrency:
+  group: terraform-infra
+  cancel-in-progress: false
+
+env:
+  TF_VERSION: "1.15.8"
+  AWS_REGION: eu-west-1
+  TF_IN_AUTOMATION: "true"
+  LAYERS: "02_eks 01_network" # reverse of the apply order
+
+jobs:
+  destroy:
+    runs-on: ubuntu-24.04
+    # No reviewer on this environment: nobody approves at 22:00. Still main only, so a PR
+    # can never run it. Its own environment secret AWS_APPLY_ROLE_ARN (same role).
+    environment: infra-destroy
+    timeout-minutes: 60
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+
+      - uses: aws-actions/configure-aws-credentials@v5
+        with:
+          role-to-assume: ${{ secrets.AWS_APPLY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: gha-destroy-${{ github.run_id }}
+          role-duration-seconds: 3600
+          mask-aws-account-id: true
+
+      # Until Argo CD deletes the apps first (next slice), stop here instead of letting
+      # terraform destroy hang on ENIs of an ALB it does not know about.
+      - name: Kubernetes-created resources gone?
+        run: bash scripts/leftover-check.sh k8s
+
+      - name: destroy each layer in reverse order
+        run: |
+          set -euo pipefail
+          for layer in $LAYERS; do
+            echo "::group::$layer"
+            cd "live/$layer"
+            terraform init -input=false -no-color -backend-config=../backend.hcl
+            if [ -z "$(terraform state list)" ]; then
+              echo "$layer: nothing deployed, skipping" | tee -a "$GITHUB_STEP_SUMMARY"
+            else
+              terraform destroy -input=false -no-color -lock-timeout=60s -auto-approve
+              echo "$layer: destroyed" >> "$GITHUB_STEP_SUMMARY"
+            fi
+            cd - > /dev/null
+            echo "::endgroup::"
+          done
+
+      # A failed scheduled run emails the repo owner: that email is the alarm
+      - name: leftover check
+        run: bash scripts/leftover-check.sh all

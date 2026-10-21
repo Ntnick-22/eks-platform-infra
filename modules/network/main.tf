@@ -102,6 +102,8 @@ module "nat_instance" {
   # Shell access through SSM Session Manager when debugging; no SSH key, no port 22.
   attach_ssm_policy = true
 
+  permissions_boundary_arn = var.permissions_boundary_arn
+
   # We own the routes (below), so a nat_mode switch is an in-place route update,
   # not a delete in one module instance and a create in another racing for the same 0.0.0.0/0.
   update_route_tables = false

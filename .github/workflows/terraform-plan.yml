@@ -28,7 +28,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        layer: [00_bootstrap, 01_network]
+        include:
+          - layer: 00_bootstrap
+          - layer: 01_network
+          - layer: 02_eks
+            requires: network # reads /myeks/network/*: plan is skipped while the daily network is down
     defaults:
       run:
         working-directory: live/${{ matrix.layer }}
@@ -57,8 +61,32 @@ jobs:
       - name: validate
         run: terraform validate -no-color
 
+      # A daily layer can only be planned while the layer it reads from is deployed (SSM contract).
+      # Validate still runs, so syntax and module errors are caught either way.
+      - name: upstream deployed?
+        id: deps
+        if: matrix.requires
+        run: |
+          if [ -n "$(aws ssm get-parameters-by-path --path "/myeks/${{ matrix.requires }}" --query 'Parameters[0].Name' --output text | grep -v None)" ]; then
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+            echo "Plan skipped: /myeks/${{ matrix.requires }}/* not found (that layer is not deployed). Validate passed. Bring the stack up (terraform-apply → Run workflow) and re-run this check to see the plan." > plan.txt
+          fi
+
+      - name: Kubernetes version still in standard support?
+        if: matrix.layer == '02_eks'
+        run: |
+          v=$(sed -n 's/^kubernetes_version *= *"\(.*\)"/\1/p' terraform.tfvars)
+          end=$(aws eks describe-cluster-versions --cluster-versions "$v" --query 'clusterVersions[0].endOfStandardSupportDate' --output text)
+          days=$(( ( $(date -d "$end" +%s) - $(date +%s) ) / 86400 ))
+          echo "Kubernetes $v: standard support ends $end ($days days)"
+          if [ "$days" -lt 0 ]; then echo "::error::Kubernetes $v is in EXTENDED support (6x the price). Upgrade it."; exit 1; fi
+          if [ "$days" -lt 90 ]; then echo "::warning::Kubernetes $v leaves standard support in $days days. Plan the upgrade."; fi
+
       - name: plan
         id: plan
+        if: steps.deps.outputs.ok != 'false'
         env:
           TF_VAR_budget_alert_emails: ${{ secrets.BUDGET_ALERT_EMAILS }}
         run: |
@@ -69,7 +97,7 @@ jobs:
           terraform show -no-color tfplan | sed "s/${ACCOUNT_ID}/<account-id>/g" > plan.txt
 
       - name: comment plan on PR
-        if: always() && steps.plan.outcome != 'skipped'
+        if: always() && (steps.plan.outcome != 'skipped' || steps.deps.outputs.ok == 'false')
         uses: actions/github-script@v8
         env:
           LAYER: ${{ matrix.layer }}

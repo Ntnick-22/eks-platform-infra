@@ -56,6 +56,11 @@ variable "github_apply_environment" {
   type        = string
 }
 
+variable "github_destroy_environment" {
+  description = "GitHub environment for the nightly destroy (main only, no reviewer: nobody approves at 22:00)"
+  type        = string
+}
+
 variable "ci_applied_layers" {
   description = "Layers CI applies, in order. The apply role may write only these state keys."
   type        = list(string)
