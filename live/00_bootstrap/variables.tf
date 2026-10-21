@@ -51,6 +51,21 @@ variable "ecr_repositories" {
   }
 }
 
+variable "github_apply_environment" {
+  description = "Protected GitHub environment whose jobs may assume the apply role (main only, owner approval)"
+  type        = string
+}
+
+variable "ci_applied_layers" {
+  description = "Layers CI applies, in order. The apply role may write only these state keys."
+  type        = list(string)
+
+  validation {
+    condition     = !contains(var.ci_applied_layers, "00_bootstrap")
+    error_message = "00_bootstrap is applied by a human only (ADR-0018): CI must never be able to change its own role."
+  }
+}
+
 # ── Optional ──────────────────────────────────────────────────────────────────
 
 variable "tfstate_noncurrent_version_days" {

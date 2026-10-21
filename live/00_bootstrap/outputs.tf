@@ -17,3 +17,8 @@ output "ecr_repository_urls" {
   description = "Image repository URLs by app component (the app repo's CI pushes here)"
   value       = { for k, m in module.ecr : k => m.repository_url }
 }
+
+output "gha_apply_role_arn" {
+  description = "Role the apply workflow assumes (store as secret AWS_APPLY_ROLE_ARN in the GitHub environment)"
+  value       = module.gha_apply_role.arn
+}

@@ -31,3 +31,15 @@ module "ecr" {
 
   name = each.value
 }
+
+module "gha_apply_role" {
+  source = "../../modules/github_oidc_role"
+
+  name                = local.apply_role_name
+  oidc_provider_arn   = data.aws_iam_openid_connect_provider.github.arn
+  subjects            = local.apply_role_subjects
+  managed_policy_arns = [local.read_only_policy_arn] # plan needs to read everything it refreshes
+  inline_policies = {
+    ci-apply = data.aws_iam_policy_document.ci_apply.json
+  }
+}

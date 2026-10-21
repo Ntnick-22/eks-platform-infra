@@ -28,7 +28,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        layer: [00_bootstrap]
+        layer: [00_bootstrap, 01_network]
     defaults:
       run:
         working-directory: live/${{ matrix.layer }}
