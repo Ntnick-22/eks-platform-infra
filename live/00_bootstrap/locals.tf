@@ -25,13 +25,15 @@ locals {
 
   # AWS-managed policies the EKS module attaches (cluster + node roles) and the EBS CSI driver needs.
   # Anything else attached must be one of our own myeks-* policies.
+  # Names include the IAM path: some AWS policies live under service-role/ (check with
+  # aws iam list-policies --scope AWS --query "Policies[?PolicyName=='<name>'].Arn").
   attachable_aws_policies = [
     "AmazonEKSClusterPolicy",
     "AmazonEKSWorkerNodePolicy",
     "AmazonEKS_CNI_Policy",
     "AmazonEC2ContainerRegistryReadOnly",
     "AmazonSSMManagedInstanceCore",
-    "AmazonEBSCSIDriverPolicy",
+    "service-role/AmazonEBSCSIDriverPolicy",
   ]
 
   # Service-linked roles that EKS, node groups, Spot, ASGs and the ALB controller create on first use

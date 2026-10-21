@@ -150,19 +150,20 @@ data "aws_iam_policy_document" "ci_apply" {
 
   # ── Guard rails (explicit Deny always wins) ──
   # myeks-* also matches the CI roles: without this the apply role could rewrite its own trust or policies.
+  # Reads stay allowed: the EKS module resolves "who am I" with iam:GetRole on the caller's own role.
   statement {
-    sid       = "DenyChangingCiRoles"
-    effect    = "Deny"
-    actions   = ["iam:*"]
-    resources = ["${local.iam_arn}:role/${var.project}-gha-*"]
+    sid         = "DenyChangingCiRoles"
+    effect      = "Deny"
+    not_actions = ["iam:Get*", "iam:List*"]
+    resources   = ["${local.iam_arn}:role/${var.project}-gha-*"]
   }
 
   # myeks-* also matches the boundary itself: CI must not weaken it or strip it from a role
   statement {
-    sid       = "DenyChangingBoundary"
-    effect    = "Deny"
-    actions   = ["iam:*"]
-    resources = [module.permissions_boundary.arn]
+    sid         = "DenyChangingBoundary"
+    effect      = "Deny"
+    not_actions = ["iam:Get*", "iam:List*"]
+    resources   = [module.permissions_boundary.arn]
   }
 
   statement {
