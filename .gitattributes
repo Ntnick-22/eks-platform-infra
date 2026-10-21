@@ -1,2 +1,2 @@
-# Shell scripts must keep LF endings on every OS: with CRLF, bash fails with "$'': command not found"
+# Shell scripts keep LF endings on every OS (with CRLF, bash fails: "command not found" on )
 *.sh text eol=lf
