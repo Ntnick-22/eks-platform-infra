@@ -63,3 +63,8 @@ module "contract" {
     ci_apply_role_arn        = module.gha_apply_role.arn
   }
 }
+
+# Region-wide guard rails that protect every project in the account
+module "account_baseline" {
+  source = "../../modules/account_baseline"
+}

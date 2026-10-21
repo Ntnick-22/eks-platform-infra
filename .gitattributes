@@ -1,0 +1,2 @@
+# Shell scripts keep LF line endings on every OS: with CRLF, bash fails with "command not found"
+*.sh text eol=lf
