@@ -10,6 +10,14 @@ locals {
   # OIDC 'sub' GitHub sends for workflows triggered by pull_request
   plan_role_subjects = ["${var.github_oidc_sub_prefix}:pull_request"]
 
+  # Apply role: only jobs running in the protected environment get this 'sub'
+  apply_role_name     = "${var.project}-gha-apply"
+  apply_role_subjects = ["${var.github_oidc_sub_prefix}:environment:${var.github_apply_environment}"]
+
+  # ARN building blocks for the apply policy
+  account_id = data.aws_caller_identity.current.account_id
+  iam_arn    = "arn:${data.aws_partition.current.partition}:iam::${local.account_id}"
+
   # backend => myeks/backend
   ecr_repository_names = { for r in var.ecr_repositories : r => "${var.project}/${r}" }
 }
