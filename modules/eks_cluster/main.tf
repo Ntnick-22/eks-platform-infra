@@ -77,6 +77,11 @@ module "eks" {
       configuration_values = jsonencode({
         defaultStorageClass = { enabled = true }
       })
+      # A replaced add-on must start clean: preserve = true (module default) leaves the old
+      # Deployment and Pod Identity association behind, and the new add-on then fails with
+      # "Association already exists". OVERWRITE adopts any leftover Kubernetes objects.
+      preserve                    = false
+      resolve_conflicts_on_create = "OVERWRITE"
       pod_identity_association = [{
         role_arn        = module.ebs_csi_role.arn
         service_account = "ebs-csi-controller-sa"
