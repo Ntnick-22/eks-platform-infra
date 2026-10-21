@@ -73,3 +73,9 @@ variable "interface_endpoint_services" {
     "ssmmessages",          # Session Manager shell
   ]
 }
+
+variable "permissions_boundary_arn" {
+  description = "Permissions boundary for the NAT instance role (required when CI applies: see ADR-0018)"
+  type        = string
+  default     = null
+}

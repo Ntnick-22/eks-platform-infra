@@ -43,3 +43,23 @@ module "gha_apply_role" {
     ci-apply = data.aws_iam_policy_document.ci_apply.json
   }
 }
+
+module "permissions_boundary" {
+  source = "../../modules/permissions_boundary"
+
+  name                  = local.boundary_name
+  role_name_prefix      = "${var.project}-"
+  protected_bucket_arns = [module.tfstate_bucket.arn]
+}
+
+# Interface for the daily layers (ADR-0019)
+module "contract" {
+  source = "../../modules/ssm_contract"
+
+  path        = "/${var.project}/bootstrap"
+  description = "Published by live/00_bootstrap"
+  values = {
+    permissions_boundary_arn = module.permissions_boundary.arn
+    ci_apply_role_arn        = module.gha_apply_role.arn
+  }
+}

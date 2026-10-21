@@ -22,3 +22,8 @@ output "gha_apply_role_arn" {
   description = "Role the apply workflow assumes (store as secret AWS_APPLY_ROLE_ARN in the GitHub environment)"
   value       = module.gha_apply_role.arn
 }
+
+output "permissions_boundary_arn" {
+  description = "Boundary every CI-created role must carry"
+  value       = module.permissions_boundary.arn
+}

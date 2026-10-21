@@ -11,6 +11,8 @@ eks-platform-infra/
 │   ├── s3_bucket_secure/       versioning, SSE, public-access block, optional lifecycle
 │   ├── budget/                 monthly budget + actual/forecast email alerts
 │   ├── github_oidc_role/       IAM role trusted only for one repo/branch/environment
+│   ├── permissions_boundary/   boundary every CI-created role must carry (ADR-0018)
+│   ├── pod_identity_role/      IAM role for one Kubernetes service account (EKS Pod Identity)
 │   ├── ecr_repository/         immutable tags, scan on push, lifecycle policy
 │   ├── ssm_contract/           publishes a layer's outputs to SSM Parameter Store
 │   ├── network/                wraps terraform-aws-modules/vpc + NAT instance + S3 gateway endpoint
@@ -23,7 +25,8 @@ eks-platform-infra/
 │   ├── 02_eks/                 daily
 │   ├── 03_data/                daily
 │   └── 04_vault/               daily
-├── .github/workflows/
+├── scripts/                    leftover-check.sh: same checks in the nightly destroy and on the laptop
+├── .github/workflows/          plan (PRs) · apply (merge + approval, or Run workflow) · destroy (22:00 UTC)
 ├── .pre-commit-config.yaml
 └── .tflint.hcl
 ```
@@ -146,7 +149,7 @@ pre-commit runs `gitleaks` and `trivy config`.
 |---|---|---|
 | `00_bootstrap` | Persistent | State bucket, Budget, GitHub OIDC roles, ECR, ACM, Cognito, Vault KMS key, Loki bucket, CloudTrail |
 | `01_network` | Daily | VPC, subnets, NAT instance, S3 gateway endpoint |
-| `02_eks` | Daily | EKS, node group, add-ons, access entries, Pod Identity, Argo CD bootstrap |
+| `02_eks` | Daily | EKS, node group, add-ons, access entries, Pod Identity roles (Argo CD bootstrap: next slice) |
 | `03_data` | Daily | RDS PostgreSQL |
 | `04_vault` | Daily | Vault configuration (Terraform Vault provider) |
 

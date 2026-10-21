@@ -22,11 +22,12 @@ data "aws_caller_identity" "current" {}
 # ── Apply role permissions: what layers in ci_applied_layers need, nothing more ──
 # Grow this policy in the same PR that adds a layer to ci_applied_layers.
 data "aws_iam_policy_document" "ci_apply" {
-  # 01_network: VPC, subnets, routes, endpoints, security groups, NAT instance (launch template + ASG).
-  # Whole services, but only in our region: per-action EC2 lists are long and break on every new resource.
+  # 01_network: VPC, subnets, routes, endpoints, SGs, NAT instance (launch template + ASG).
+  # 02_eks: cluster, node group, add-ons, access entries, Pod Identity associations.
+  # Whole services, but only in our region: per-action lists are long and break on every new resource.
   statement {
-    sid       = "Ec2AndAutoscalingInRegion"
-    actions   = ["ec2:*", "autoscaling:*"]
+    sid       = "RegionalServicesInRegion"
+    actions   = ["ec2:*", "autoscaling:*", "eks:*"]
     resources = ["*"]
 
     condition {
@@ -36,11 +37,30 @@ data "aws_iam_policy_document" "ci_apply" {
     }
   }
 
-  # IAM only for resources named <project>-* (e.g. the NAT instance role myeks-nat-1a)
+  # EKS control plane logs (drill days only): /aws/eks/<cluster>/cluster
+  statement {
+    sid       = "EksControlPlaneLogGroup"
+    actions   = ["logs:*"]
+    resources = ["arn:${data.aws_partition.current.partition}:logs:${var.region}:${local.account_id}:log-group:/aws/eks/${var.project}/*"]
+  }
+
+  # ── IAM: only <project>-* roles, and only with the boundary attached ──
+  statement {
+    sid       = "IamCreateRoleOnlyWithBoundary"
+    actions   = ["iam:CreateRole", "iam:PutRolePermissionsBoundary"]
+    resources = ["${local.iam_arn}:role/${var.project}-*"]
+
+    condition {
+      test     = "StringEquals"
+      variable = "iam:PermissionsBoundary"
+      values   = [module.permissions_boundary.arn]
+    }
+  }
+
   statement {
     sid = "IamProjectRolesAndProfiles"
     actions = [
-      "iam:CreateRole", "iam:DeleteRole", "iam:GetRole", "iam:UpdateRole", "iam:UpdateAssumeRolePolicy",
+      "iam:DeleteRole", "iam:GetRole", "iam:UpdateRole", "iam:UpdateAssumeRolePolicy",
       "iam:TagRole", "iam:UntagRole",
       "iam:PutRolePolicy", "iam:DeleteRolePolicy", "iam:GetRolePolicy",
       "iam:ListRolePolicies", "iam:ListAttachedRolePolicies", "iam:ListInstanceProfilesForRole",
@@ -63,54 +83,62 @@ data "aws_iam_policy_document" "ci_apply" {
     resources = ["${local.iam_arn}:policy/${var.project}-*"]
   }
 
-  # Attach only our own customer policies: never AdministratorAccess or any other AWS-managed policy
+  # Attach only our own policies or the short list of AWS-managed ones EKS needs: never AdministratorAccess
   statement {
-    sid       = "IamAttachOnlyProjectPolicies"
+    sid       = "IamAttachAllowListedPolicies"
     actions   = ["iam:AttachRolePolicy", "iam:DetachRolePolicy"]
     resources = ["${local.iam_arn}:role/${var.project}-*"]
 
     condition {
       test     = "ArnLike"
       variable = "iam:PolicyARN"
-      values   = ["${local.iam_arn}:policy/${var.project}-*"]
+      values = concat(
+        ["${local.iam_arn}:policy/${var.project}-*"],
+        [for p in local.attachable_aws_policies : "arn:${data.aws_partition.current.partition}:iam::aws:policy/${p}"],
+      )
     }
   }
 
-  # The NAT instance's ASG launches EC2 with a project instance profile
+  # NAT instance → EC2, cluster + node group → EKS, Pod Identity → pods.eks
   statement {
-    sid       = "PassProjectRolesToEc2"
+    sid       = "PassProjectRolesToServices"
     actions   = ["iam:PassRole"]
     resources = ["${local.iam_arn}:role/${var.project}-*"]
 
     condition {
       test     = "StringEquals"
       variable = "iam:PassedToService"
-      values   = ["ec2.amazonaws.com"]
+      values   = ["ec2.amazonaws.com", "eks.amazonaws.com", "pods.eks.amazonaws.com"]
     }
   }
 
-  # First ASG in an account creates this AWS role; it already exists here, but a fresh account needs it
+  # These already exist in this account; a fresh account creates them on first use
   statement {
-    sid       = "AutoscalingServiceLinkedRole"
+    sid       = "ServiceLinkedRoles"
     actions   = ["iam:CreateServiceLinkedRole"]
-    resources = ["${local.iam_arn}:role/aws-service-role/autoscaling.amazonaws.com/AWSServiceRoleForAutoScaling"]
+    resources = ["${local.iam_arn}:role/aws-service-role/*"]
 
     condition {
       test     = "StringEquals"
       variable = "iam:AWSServiceName"
-      values   = ["autoscaling.amazonaws.com"]
+      values   = local.service_linked_role_services
     }
   }
 
-  # SSM contract: /<project>/* only
+  # ── SSM contract: read every layer, write only the CI layers' own paths ──
   statement {
-    sid = "SsmContract"
+    sid       = "SsmContractRead"
+    actions   = ["ssm:GetParameter", "ssm:GetParameters", "ssm:GetParametersByPath", "ssm:ListTagsForResource"]
+    resources = ["arn:${data.aws_partition.current.partition}:ssm:${var.region}:${local.account_id}:parameter/${var.project}/*"]
+  }
+
+  statement {
+    sid = "SsmContractWriteOwnLayers"
     actions = [
       "ssm:PutParameter", "ssm:DeleteParameter", "ssm:DeleteParameters",
-      "ssm:GetParameter", "ssm:GetParameters", "ssm:GetParametersByPath",
-      "ssm:AddTagsToResource", "ssm:RemoveTagsFromResource", "ssm:ListTagsForResource",
+      "ssm:AddTagsToResource", "ssm:RemoveTagsFromResource",
     ]
-    resources = ["arn:${data.aws_partition.current.partition}:ssm:${var.region}:${local.account_id}:parameter/${var.project}/*"]
+    resources = [for p in local.ci_contract_paths : "arn:${data.aws_partition.current.partition}:ssm:${var.region}:${local.account_id}:parameter/${var.project}/${p}/*"]
   }
 
   # State: write only the keys of the layers CI applies (state file + lockfile). 00_bootstrap stays read-only.
@@ -120,12 +148,27 @@ data "aws_iam_policy_document" "ci_apply" {
     resources = [for l in var.ci_applied_layers : "${module.tfstate_bucket.arn}/${l}/*"]
   }
 
-  # Guard rail: myeks-* also matches the CI roles themselves. Without this, the apply role could
-  # rewrite its own trust/policies (or the plan role's) and grant itself anything.
+  # ── Guard rails (explicit Deny always wins) ──
+  # myeks-* also matches the CI roles: without this the apply role could rewrite its own trust or policies.
   statement {
     sid       = "DenyChangingCiRoles"
     effect    = "Deny"
     actions   = ["iam:*"]
     resources = ["${local.iam_arn}:role/${var.project}-gha-*"]
+  }
+
+  # myeks-* also matches the boundary itself: CI must not weaken it or strip it from a role
+  statement {
+    sid       = "DenyChangingBoundary"
+    effect    = "Deny"
+    actions   = ["iam:*"]
+    resources = [module.permissions_boundary.arn]
+  }
+
+  statement {
+    sid       = "DenyRemovingBoundaryFromRoles"
+    effect    = "Deny"
+    actions   = ["iam:DeleteRolePermissionsBoundary"]
+    resources = ["*"]
   }
 }

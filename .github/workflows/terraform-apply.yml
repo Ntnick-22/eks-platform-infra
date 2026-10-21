@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - "live/01_network/**"
+      - "live/02_eks/**"
       - "modules/**"
       - ".github/workflows/terraform-apply.yml"
   workflow_dispatch: # morning bring-up: Actions → terraform-apply → Run workflow
@@ -14,29 +15,24 @@ permissions:
   id-token: write # lets the job request a GitHub OIDC token
 
 # One apply at a time, and never cancel a running one: a half-finished apply
-# leaves AWS and the state out of step.
+# leaves AWS and the state out of step. Shares the group with terraform-destroy.
 concurrency:
-  group: terraform-apply
+  group: terraform-infra
   cancel-in-progress: false
 
 env:
   TF_VERSION: "1.15.8"
   AWS_REGION: eu-west-1
   TF_IN_AUTOMATION: "true"
+  LAYERS: "01_network 02_eks" # apply order; each layer reads the ones before it
 
 jobs:
   apply:
     runs-on: ubuntu-24.04
-    # The job waits here for the owner's approval. Only jobs in this environment get the
-    # OIDC sub "...:environment:infra" that the apply role trusts, and only from main.
+    # The job waits here for the owner's approval: ONE approval brings the whole stack up.
+    # Only jobs in this environment get the OIDC sub "...:environment:infra", and only from main.
     environment: infra
-    strategy:
-      max-parallel: 1 # layers depend on each other: one at a time, in list order
-      matrix:
-        layer: [01_network]
-    defaults:
-      run:
-        working-directory: live/${{ matrix.layer }}
+    timeout-minutes: 60
 
     steps:
       - uses: actions/checkout@v5
@@ -51,30 +47,40 @@ jobs:
           role-to-assume: ${{ secrets.AWS_APPLY_ROLE_ARN }} # environment secret: only readable by jobs in "infra"
           aws-region: ${{ env.AWS_REGION }}
           role-session-name: gha-apply-${{ github.run_id }}
+          role-duration-seconds: 3600 # EKS create + node group can take ~20 min
           mask-aws-account-id: true
 
-      - name: init
-        run: terraform init -input=false -backend-config=../backend.hcl
-
-      - name: plan
-        id: plan
+      - name: plan and apply each layer in order
         run: |
-          # -detailed-exitcode: 0 = no changes, 1 = error, 2 = changes
-          set +e
-          terraform plan -input=false -no-color -lock-timeout=60s -detailed-exitcode -out=tfplan
-          code=$?
-          set -e
-          if [ "$code" -eq 1 ]; then exit 1; fi
-          echo "changes=$([ "$code" -eq 2 ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
-
+          set -euo pipefail
           ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-          {
-            echo "### Terraform apply: \`${{ matrix.layer }}\` (changes: $([ "$code" -eq 2 ] && echo yes || echo no))"
-            echo '```'
-            terraform show -no-color tfplan | sed "s/${ACCOUNT_ID}/<account-id>/g" | tail -c 60000
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: apply
-        if: steps.plan.outputs.changes == 'true'
-        run: terraform apply -input=false -no-color -lock-timeout=60s tfplan
+          for layer in $LAYERS; do
+            echo "::group::$layer"
+            cd "live/$layer"
+            terraform init -input=false -no-color -backend-config=../backend.hcl
+
+            # -detailed-exitcode: 0 = no changes, 1 = error, 2 = changes
+            set +e
+            terraform plan -input=false -no-color -lock-timeout=60s -detailed-exitcode -out=tfplan
+            code=$?
+            set -e
+            [ "$code" -eq 1 ] && exit 1
+
+            {
+              echo "### \`$layer\`: $([ "$code" -eq 2 ] && echo changes applied || echo no changes)"
+              echo '<details><summary>plan</summary>'
+              echo
+              echo '```'
+              terraform show -no-color tfplan | sed "s/${ACCOUNT_ID}/<account-id>/g" | tail -c 30000
+              echo '```'
+              echo '</details>'
+            } >> "$GITHUB_STEP_SUMMARY"
+
+            if [ "$code" -eq 2 ]; then
+              terraform apply -input=false -no-color -lock-timeout=60s tfplan
+            fi
+            rm -f tfplan
+            cd - > /dev/null
+            echo "::endgroup::"
+          done

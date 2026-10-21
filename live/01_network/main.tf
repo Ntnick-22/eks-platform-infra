@@ -8,6 +8,7 @@ module "network" {
   nat_mode                   = var.nat_mode
   nat_instance_type          = var.nat_instance_type
   enable_interface_endpoints = var.enable_interface_endpoints
+  permissions_boundary_arn   = data.aws_ssm_parameter.permissions_boundary_arn.insecure_value
 }
 
 # Interface for 02_eks and 03_data (ADR-0019). Lists are comma-joined: SSM String holds one value.

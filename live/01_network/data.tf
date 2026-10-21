@@ -1,2 +1,4 @@
-# 01_network is the first daily layer: it reads nothing from other layers.
-# AZs and region are looked up inside modules/network.
+# Values owned by 00_bootstrap (ADR-0019)
+data "aws_ssm_parameter" "permissions_boundary_arn" {
+  name = "/${var.project}/bootstrap/permissions_boundary_arn"
+}

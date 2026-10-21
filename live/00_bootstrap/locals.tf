@@ -11,8 +11,37 @@ locals {
   plan_role_subjects = ["${var.github_oidc_sub_prefix}:pull_request"]
 
   # Apply role: only jobs running in the protected environment get this 'sub'
-  apply_role_name     = "${var.project}-gha-apply"
-  apply_role_subjects = ["${var.github_oidc_sub_prefix}:environment:${var.github_apply_environment}"]
+  # Apply role: approved applies (infra) and the unattended nightly destroy (infra-destroy)
+  apply_role_name = "${var.project}-gha-apply"
+  apply_role_subjects = [
+    "${var.github_oidc_sub_prefix}:environment:${var.github_apply_environment}",
+    "${var.github_oidc_sub_prefix}:environment:${var.github_destroy_environment}",
+  ]
+
+  boundary_name = "${var.project}-boundary"
+
+  # "01_network" → "network": the SSM contract path each CI layer may write (/myeks/network/*)
+  ci_contract_paths = [for l in var.ci_applied_layers : replace(l, "/^[0-9]+_/", "")]
+
+  # AWS-managed policies the EKS module attaches (cluster + node roles) and the EBS CSI driver needs.
+  # Anything else attached must be one of our own myeks-* policies.
+  attachable_aws_policies = [
+    "AmazonEKSClusterPolicy",
+    "AmazonEKSWorkerNodePolicy",
+    "AmazonEKS_CNI_Policy",
+    "AmazonEC2ContainerRegistryReadOnly",
+    "AmazonSSMManagedInstanceCore",
+    "AmazonEBSCSIDriverPolicy",
+  ]
+
+  # Service-linked roles that EKS, node groups, Spot, ASGs and the ALB controller create on first use
+  service_linked_role_services = [
+    "autoscaling.amazonaws.com",
+    "eks.amazonaws.com",
+    "eks-nodegroup.amazonaws.com",
+    "spot.amazonaws.com",
+    "elasticloadbalancing.amazonaws.com",
+  ]
 
   # ARN building blocks for the apply policy
   account_id = data.aws_caller_identity.current.account_id
