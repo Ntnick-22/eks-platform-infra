@@ -70,11 +70,12 @@ module "eks" {
     coredns        = {}
     metrics-server = {}
     aws-ebs-csi-driver = {
+      # gp3 StorageClass marked default: since 1.30 EKS no longer makes gp2 the default.
+      # No extra volume tags needed: the add-on runs the driver with --k8s-tag-cluster-id=<cluster>,
+      # so every volume already gets kubernetes.io/cluster/<cluster>=owned (scripts/leftover-check.sh
+      # relies on it). Setting that tag ourselves crashes the driver: the kubernetes.io prefix is reserved.
       configuration_values = jsonencode({
-        # gp3 StorageClass marked default: since 1.30 EKS no longer makes gp2 the default
         defaultStorageClass = { enabled = true }
-        # Tag every volume with the cluster, so scripts/leftover-check.sh can find forgotten PVC volumes
-        controller = { extraVolumeTags = { "kubernetes.io/cluster/${var.name}" = "owned" } }
       })
       pod_identity_association = [{
         role_arn        = module.ebs_csi_role.arn
