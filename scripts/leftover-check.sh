@@ -1,61 +1,88 @@
 #!/usr/bin/env bash
-# Finds paid resources of the daily stack that still exist. Exit 1 if any are found.
+# Finds paid resources of the daily stack that still exist.
 #
 #   scripts/leftover-check.sh k8s   before destroying 02_eks: AWS resources Kubernetes created
 #                                   (ALBs from Ingresses, EBS volumes from PVCs). Terraform does not
 #                                   know them, so they block the VPC delete and keep costing money.
 #   scripts/leftover-check.sh all   after the destroy: everything of the daily stack
 #
+# Exit codes: 0 = clean · 1 = leftovers found · 2 = a query failed (result unknown: never report "clean")
+#             64 = wrong usage
 # Same script in the nightly workflow and on the laptop. Needs read-only AWS access.
 set -euo pipefail
 
+usage() { sed -n '2,11p' "$0" | sed 's/^# \{0,1\}//'; } # the header comment above is the help text
+
 MODE="${1:-all}"
+case "$MODE" in
+  -h | --help) usage; exit 0 ;;
+  k8s | all) ;;
+  *) # an unknown mode must not silently run fewer checks and report "clean"
+    echo "unknown mode: $MODE" >&2
+    usage >&2
+    exit 64
+    ;;
+esac
+
 PROJECT="${PROJECT:-myeks}"
 CLUSTER="${CLUSTER:-$PROJECT}"
 export AWS_REGION="${AWS_REGION:-eu-west-1}"
 found=0
+failed=0
 
-check() { # check "<label>" "<output of an aws query>"
-  if [ -n "$2" ] && [ "$2" != "None" ]; then
-    echo "LEFTOVER  $1: $2"
+# check "<label>" <command...>
+# Runs the command itself instead of receiving its output as an argument: a failing
+# "$(cmd)" used as an argument does NOT trigger set -e, so an AccessDenied would look "ok".
+check() {
+  local label=$1 out
+  shift
+  if ! out=$("$@" 2>&1); then
+    echo "ERROR     $label: query failed: $out" >&2 # stderr: stays visible when stdout is piped
+    failed=1
+  elif [ -n "$out" ] && [ "$out" != "None" ]; then # --output text prints "None" for null
+    echo "LEFTOVER  $label: $out"
     found=1
   else
-    echo "ok        $1"
+    echo "ok        $label"
   fi
 }
 
 # ── Created by Kubernetes controllers ────────────────────────────────────────
-check "load balancers (AWS LB Controller)" "$(aws resourcegroupstaggingapi get-resources \
+check "load balancers (AWS LB Controller)" aws resourcegroupstaggingapi get-resources \
   --tag-filters "Key=elbv2.k8s.aws/cluster,Values=$CLUSTER" \
   --resource-type-filters elasticloadbalancing:loadbalancer \
-  --query 'ResourceTagMappingList[].ResourceARN' --output text)"
+  --query 'ResourceTagMappingList[].ResourceARN' --output text
 
-check "EBS volumes (EBS CSI driver)" "$(aws ec2 describe-volumes \
+check "EBS volumes (EBS CSI driver)" aws ec2 describe-volumes \
   --filters "Name=tag-key,Values=kubernetes.io/cluster/$CLUSTER" \
-  --query 'Volumes[].VolumeId' --output text)"
+  --query 'Volumes[].VolumeId' --output text
 
 if [ "$MODE" = "all" ]; then
   # ── Created by Terraform (should be gone after destroy) ─────────────────────
-  check "EKS cluster" "$(aws eks list-clusters --query "clusters[?@=='$CLUSTER']" --output text)"
+  check "EKS cluster" aws eks list-clusters --query "clusters[?@=='$CLUSTER']" --output text
 
-  check "EC2 instances (nodes, NAT)" "$(aws ec2 describe-instances \
+  check "EC2 instances (nodes, NAT)" aws ec2 describe-instances \
     --filters "Name=tag:Project,Values=$PROJECT" "Name=instance-state-name,Values=pending,running,stopping,stopped" \
-    --query 'Reservations[].Instances[].InstanceId' --output text)"
+    --query 'Reservations[].Instances[].InstanceId' --output text
 
-  check "VPC" "$(aws ec2 describe-vpcs --filters "Name=tag:Project,Values=$PROJECT" --query 'Vpcs[].VpcId' --output text)"
+  check "VPC" aws ec2 describe-vpcs --filters "Name=tag:Project,Values=$PROJECT" --query 'Vpcs[].VpcId' --output text
 
-  check "network interfaces" "$(aws ec2 describe-network-interfaces \
-    --filters "Name=tag:Project,Values=$PROJECT" --query 'NetworkInterfaces[].NetworkInterfaceId' --output text)"
+  check "network interfaces" aws ec2 describe-network-interfaces \
+    --filters "Name=tag:Project,Values=$PROJECT" --query 'NetworkInterfaces[].NetworkInterfaceId' --output text
 
-  check "control plane log group" "$(aws logs describe-log-groups \
-    --log-group-name-prefix "/aws/eks/$CLUSTER/" --query 'logGroups[].logGroupName' --output text)"
+  check "control plane log group" aws logs describe-log-groups \
+    --log-group-name-prefix "/aws/eks/$CLUSTER/" --query 'logGroups[].logGroupName' --output text
 
   for layer in network eks; do
-    check "SSM contract /$PROJECT/$layer" "$(aws ssm get-parameters-by-path \
-      --path "/$PROJECT/$layer" --query 'Parameters[].Name' --output text)"
+    check "SSM contract /$PROJECT/$layer" aws ssm get-parameters-by-path \
+      --path "/$PROJECT/$layer" --query 'Parameters[].Name' --output text
   done
 fi
 
+if [ "$failed" -ne 0 ]; then
+  echo "::error::Leftover check could not run every query (mode: $MODE). Result unknown: check AWS manually."
+  exit 2
+fi
 if [ "$found" -ne 0 ]; then
   echo "::error::Leftover resources found (mode: $MODE). They cost money or block the VPC delete."
   exit 1

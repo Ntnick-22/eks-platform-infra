@@ -11,6 +11,7 @@ eks-platform-infra/
 │   ├── s3_bucket_secure/       versioning, SSE, public-access block, optional lifecycle
 │   ├── budget/                 monthly budget + actual/forecast email alerts
 │   ├── github_oidc_role/       IAM role trusted only for one repo/branch/environment
+│   ├── account_baseline/       region-wide guard rails (EBS encryption by default)
 │   ├── permissions_boundary/   boundary every CI-created role must carry (ADR-0018)
 │   ├── pod_identity_role/      IAM role for one Kubernetes service account (EKS Pod Identity)
 │   ├── ecr_repository/         immutable tags, scan on push, lifecycle policy
