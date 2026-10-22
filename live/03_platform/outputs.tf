@@ -1,6 +1,6 @@
 output "argocd_namespace" {
   description = "Namespace Argo CD runs in"
-  value       = module.argocd_bootstrap.namespace
+  value       = helm_release.argocd.namespace
 }
 
 output "argocd_ui_command" {

@@ -7,7 +7,7 @@ Goal: logic is written **once**, layers stay thin, nothing is hardcoded, and no 
 
 ```
 eks-platform-infra/
-├── modules/                    ← CHILD modules: all the logic, written once, reused
+├── modules/                    ← CHILD modules: only reused, complex or security-relevant logic
 │   ├── s3_bucket_secure/       versioning, SSE, public-access block, optional lifecycle
 │   ├── budget/                 monthly budget + actual/forecast email alerts
 │   ├── github_oidc_role/       IAM role trusted only for one repo/branch/environment
@@ -17,27 +17,31 @@ eks-platform-infra/
 │   ├── ecr_repository/         immutable tags, scan on push, lifecycle policy
 │   ├── ssm_contract/           publishes a layer's outputs to SSM Parameter Store
 │   ├── network/                wraps terraform-aws-modules/vpc + NAT instance + S3 gateway endpoint
-│   ├── eks_cluster/            wraps terraform-aws-modules/eks + add-ons + Pod Identity
-│   └── rds_postgres/           (Phase 1, 03_data)
-├── live/                       ← ROOT modules: thin wiring, one state each, applied in order
+│   └── eks_cluster/            wraps terraform-aws-modules/eks + add-ons + Pod Identity
+├── live/                       ← ROOT modules: one state each, applied in order
 │   ├── backend.hcl             bucket + region + lockfile, written once
 │   ├── 00_bootstrap/           persistent
 │   ├── 01_network/             daily
 │   ├── 02_eks/                 daily
-│   ├── 03_data/                daily
-│   └── 04_vault/               daily
+│   ├── 03_platform/            daily: Argo CD + root app, IAM-linked add-ons (flat: argocd.tf, helm-values/)
+│   ├── 04_data/                daily: RDS (prod DB)
+│   └── 05_vault/               daily
 ├── scripts/                    leftover-check.sh: same checks in the nightly destroy and on the laptop
 ├── .github/workflows/          plan (PRs) · apply (merge + approval, or Run workflow) · destroy (22:00 UTC)
 ├── .pre-commit-config.yaml
 └── .tflint.hcl
 ```
 
-**Root module (`live/NN_layer/`)**: answers *what* and *how much*. It contains only:
-`module` calls, `data` lookups, `locals`, and values in `terraform.tfvars`.
-**No `resource` blocks in roots.** If a root needs a resource, it belongs in a child module.
+**Root module (`live/NN_layer/`)**: answers *what* and *how much*. It contains `data` lookups, `locals`,
+values in `terraform.tfvars`, module calls, and **simple single-use resources written directly**, one file per
+concern (`argocd.tf`, `external_secrets.tf`), with Helm values in `helm-values/*.yaml`.
 
-**Child module (`modules/<name>/`)**: answers *how*. It contains the resources and the safe defaults.
-A child module must add value: it bundles several resources, enforces safe defaults, or gives a simpler interface.
+**Child module (`modules/<name>/`)**: answers *how*. Write one only when it earns its place:
+- **reused**: called more than once (`pod_identity_role`, `ssm_contract`, `github_oidc_role`, `ecr_repository`)
+- **complex**: hides real logic or a community module (`network`, `eks_cluster`)
+- **security-relevant**: enforces safe defaults nobody may forget (`s3_bucket_secure`, `permissions_boundary`)
+
+A module wrapping one or two resources that are used once is just indirection: keep those in the root.
 
 **Community modules** (`terraform-aws-modules/vpc`, `terraform-aws-modules/eks`) are called **only inside our
 child modules** (`network`, `eks_cluster`), never from a root. Roots keep a small, stable interface, and an upgrade of
@@ -54,7 +58,7 @@ To change behaviour, edit the child module once. To change a size or count, edit
 | `providers.tf` | `provider` blocks with `default_tags` | credentials |
 | `data.tf` | account, region, AZs, values from other layers (SSM) | |
 | `locals.tf` | naming, computed values | |
-| `main.tf` | `module` calls | `resource` blocks, literal names/IDs/ARNs |
+| `main.tf` or `<concern>.tf` | module calls, simple single-use resources (see section 1) | literal names/IDs/ARNs |
 | `variables.tf` | inputs with `description` + `type` (+ `validation`) | secrets |
 | `terraform.tfvars` | the only place for tunable values (CIDRs, sizes, counts) | secrets |
 | `outputs.tf` | outputs with `description` | |
@@ -112,8 +116,9 @@ Reference chain: a layer reads only from layers **above** it, never below.
 00_bootstrap → /myeks/bootstrap/*   (ECR, KMS, ACM, Loki bucket)
 01_network   → /myeks/network/*     (vpc_id, subnet ids)
 02_eks       → /myeks/eks/*         reads network/*, bootstrap/*
-03_data      → /myeks/data/*        reads network/*, eks/*
-04_vault                            reads data/*, eks/*, bootstrap/*
+03_platform  → /myeks/platform/*     reads eks/*
+04_data      → /myeks/data/*        reads network/*, eks/*
+05_vault                            reads data/*, eks/*, bootstrap/*
 ```
 Where lookups live:
 - Values **another layer** owns → the root's `data.tf`, passed into child modules as inputs.
@@ -129,7 +134,7 @@ So secrets never pass through variables or tfvars.
 |---|---|---|
 | RDS master password | `manage_master_user_password = true` (RDS → Secrets Manager) | No |
 | App DB credentials | Vault dynamic credentials → ESO | No |
-| Vault token for `04_vault` | `ephemeral "aws_secretsmanager_secret_version"` (Terraform ≥ 1.10) | No |
+| Vault token for `05_vault` | `ephemeral "aws_secretsmanager_secret_version"` (Terraform ≥ 1.10) | No |
 | A password Terraform must set | write-only arguments, e.g. `password_wo` (Terraform ≥ 1.11) | No |
 | CI access to AWS | GitHub OIDC → IAM role | no keys exist |
 | Platform secrets (Grafana, Slack) | Vault KV → ESO | No |
@@ -150,9 +155,10 @@ pre-commit runs `gitleaks` and `trivy config`.
 |---|---|---|
 | `00_bootstrap` | Persistent | State bucket, Budget, GitHub OIDC roles, ECR, ACM, Cognito, Vault KMS key, Loki bucket, CloudTrail |
 | `01_network` | Daily | VPC, subnets, NAT instance, S3 gateway endpoint |
-| `02_eks` | Daily | EKS, node group, add-ons, access entries, Pod Identity roles (Argo CD bootstrap: next slice) |
-| `03_data` | Daily | RDS PostgreSQL |
-| `04_vault` | Daily | Vault configuration (Terraform Vault provider) |
+| `02_eks` | Daily | EKS, node group, EKS add-ons, access entries, Pod Identity roles |
+| `03_platform` | Daily | Argo CD + root app (syncs the gitops repo), External Secrets; later ALB controller, ExternalDNS |
+| `04_data` | Daily | RDS PostgreSQL (prod; dev uses an in-cluster test DB from the gitops repo) |
+| `05_vault` | Daily | Vault configuration (Terraform Vault provider) |
 
 Apply in order `00 → 04`; destroy in reverse `04 → 01` (`00_bootstrap` is never destroyed).
 Environments (dev/prod) are Kubernetes namespaces managed by Argo CD, not separate infrastructure folders.

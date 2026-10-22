@@ -125,6 +125,14 @@ data "aws_iam_policy_document" "ci_apply" {
     }
   }
 
+  # 03_platform: Argo CD's gitops deploy key, read at apply time into a write-only Secret (never in state).
+  # ReadOnlyAccess does not include GetSecretValue, so the plan role can never read it.
+  statement {
+    sid       = "ReadGitopsDeployKey"
+    actions   = ["secretsmanager:GetSecretValue"]
+    resources = [aws_secretsmanager_secret.gitops_deploy_key.arn]
+  }
+
   # ── SSM contract: read every layer, write only the CI layers' own paths ──
   statement {
     sid       = "SsmContractRead"

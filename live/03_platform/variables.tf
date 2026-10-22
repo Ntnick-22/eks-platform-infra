@@ -26,6 +26,16 @@ variable "argocd_apps_chart_version" {
 }
 
 variable "gitops_repo_url" {
-  description = "HTTPS URL of the gitops repo"
+  description = "SSH URL of the private gitops repo (read with a deploy key); the root app syncs its apps/ folder"
+  type        = string
+
+  validation {
+    condition     = startswith(var.gitops_repo_url, "git@github.com:")
+    error_message = "gitops_repo_url must be an SSH URL (git@github.com:<owner>/<repo>.git): the deploy key only works over SSH."
+  }
+}
+
+variable "external_secrets_chart_version" {
+  description = "external-secrets Helm chart version"
   type        = string
 }

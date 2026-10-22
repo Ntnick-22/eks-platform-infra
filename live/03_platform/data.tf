@@ -6,3 +6,8 @@ data "aws_ssm_parameter" "cluster_name" {
 data "aws_eks_cluster" "this" {
   name = data.aws_ssm_parameter.cluster_name.insecure_value
 }
+
+# Secrets Manager container for Argo CD's gitops deploy key (created empty by 00_bootstrap)
+data "aws_ssm_parameter" "gitops_deploy_key_secret_arn" {
+  name = "/${var.project}/bootstrap/gitops_deploy_key_secret_arn"
+}

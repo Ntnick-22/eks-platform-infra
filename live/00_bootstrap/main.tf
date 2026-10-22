@@ -59,8 +59,9 @@ module "contract" {
   path        = "/${var.project}/bootstrap"
   description = "Published by live/00_bootstrap"
   values = {
-    permissions_boundary_arn = module.permissions_boundary.arn
-    ci_apply_role_arn        = module.gha_apply_role.arn
+    permissions_boundary_arn     = module.permissions_boundary.arn
+    ci_apply_role_arn            = module.gha_apply_role.arn
+    gitops_deploy_key_secret_arn = aws_secretsmanager_secret.gitops_deploy_key.arn
   }
 }
 
