@@ -6,6 +6,7 @@ on:
     paths:
       - "live/01_network/**"
       - "live/02_eks/**"
+      - "live/03_platform/**"
       - "modules/**"
       - ".github/workflows/terraform-apply.yml"
   workflow_dispatch: # morning bring-up: Actions → terraform-apply → Run workflow
@@ -24,7 +25,7 @@ env:
   TF_VERSION: "1.15.8"
   AWS_REGION: eu-west-1
   TF_IN_AUTOMATION: "true"
-  LAYERS: "01_network 02_eks" # apply order; each layer reads the ones before it
+  LAYERS: "01_network 02_eks 03_platform" # apply order; each layer reads the ones before it
 
 jobs:
   apply:

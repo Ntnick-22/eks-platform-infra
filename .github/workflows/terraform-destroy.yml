@@ -18,7 +18,7 @@ env:
   TF_VERSION: "1.15.8"
   AWS_REGION: eu-west-1
   TF_IN_AUTOMATION: "true"
-  LAYERS: "02_eks 01_network" # reverse of the apply order
+  LAYERS: "03_platform 02_eks 01_network" # reverse of the apply order
 
 jobs:
   destroy:
