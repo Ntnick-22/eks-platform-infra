@@ -1,0 +1,5 @@
+# Argo CD day-0 values. Terraform owns Argo CD: change values or the chart version by PR.
+dex:
+  enabled: false # port-forward + admin for now; SSO later
+notifications:
+  enabled: false
