@@ -33,12 +33,11 @@ resource "kubernetes_secret_v1" "gitops_repo" {
     }
   }
 
-  data = {
-    type = "git"
-    url  = var.gitops_repo_url
-  }
-
+  # data and data_wo cannot be combined, so the whole Secret is write-only.
+  # Bump data_wo_revision when type/url change: Terraform cannot diff write-only values.
   data_wo = {
+    type          = "git"
+    url           = var.gitops_repo_url
     sshPrivateKey = ephemeral.aws_secretsmanager_secret_version.gitops_deploy_key.secret_string
   }
   data_wo_revision = 1
