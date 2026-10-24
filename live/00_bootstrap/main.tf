@@ -69,3 +69,15 @@ module "contract" {
 module "account_baseline" {
   source = "../../modules/account_baseline"
 }
+
+# App CI role: GitHub Actions in eks-platform-app (main only) pushes images to ECR
+module "gha_app_ci_role" {
+  source = "../../modules/github_oidc_role"
+
+  name              = local.app_ci_role_name
+  oidc_provider_arn = data.aws_iam_openid_connect_provider.github.arn
+  subjects          = local.app_ci_role_subjects
+  inline_policies = {
+    ecr-push = data.aws_iam_policy_document.app_ci_ecr_push.json
+  }
+}
