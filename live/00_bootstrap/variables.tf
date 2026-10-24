@@ -41,6 +41,16 @@ variable "github_oidc_sub_prefix" {
   }
 }
 
+variable "github_app_oidc_sub_prefix" {
+  description = "App repo (eks-platform-app) OIDC sub prefix: gh api repos/<owner>/<repo>/actions/oidc/customization/sub"
+  type        = string
+
+  validation {
+    condition     = startswith(var.github_app_oidc_sub_prefix, "repo:") && !strcontains(var.github_app_oidc_sub_prefix, "*")
+    error_message = "github_app_oidc_sub_prefix must start with 'repo:' and contain no wildcard."
+  }
+}
+
 variable "ecr_repositories" {
   description = "App components that get an image repository (named <project>/<component>)"
   type        = list(string)

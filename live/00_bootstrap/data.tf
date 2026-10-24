@@ -181,3 +181,27 @@ data "aws_iam_policy_document" "ci_apply" {
     resources = ["*"]
   }
 }
+
+# ── App CI: push images to our ECR repositories, nothing else ──
+# GetAuthorizationToken has no resource-level permissions (it only returns a registry login).
+data "aws_iam_policy_document" "app_ci_ecr_push" {
+  statement {
+    sid       = "EcrLogin"
+    actions   = ["ecr:GetAuthorizationToken"]
+    resources = ["*"]
+  }
+
+  statement {
+    sid = "EcrPushOwnRepositories"
+    actions = [
+      "ecr:BatchCheckLayerAvailability",
+      "ecr:InitiateLayerUpload",
+      "ecr:UploadLayerPart",
+      "ecr:CompleteLayerUpload",
+      "ecr:PutImage",
+      "ecr:BatchGetImage",
+      "ecr:DescribeImages",
+    ]
+    resources = [for m in module.ecr : m.arn]
+  }
+}

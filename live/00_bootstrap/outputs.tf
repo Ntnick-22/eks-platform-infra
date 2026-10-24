@@ -27,3 +27,8 @@ output "permissions_boundary_arn" {
   description = "Boundary every CI-created role must carry"
   value       = module.permissions_boundary.arn
 }
+
+output "gha_app_ci_role_arn" {
+  description = "Role the app repo CI assumes (store as secret AWS_APP_CI_ROLE_ARN in eks-platform-app)"
+  value       = module.gha_app_ci_role.arn
+}

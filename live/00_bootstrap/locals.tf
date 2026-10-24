@@ -10,6 +10,10 @@ locals {
   # OIDC 'sub' GitHub sends for workflows triggered by pull_request
   plan_role_subjects = ["${var.github_oidc_sub_prefix}:pull_request"]
 
+  # App CI (eks-platform-app): only builds of main may push images. PRs test and build without AWS.
+  app_ci_role_name     = "${var.project}-gha-app-ci"
+  app_ci_role_subjects = ["${var.github_app_oidc_sub_prefix}:ref:refs/heads/main"]
+
   # Apply role: only jobs running in the protected environment get this 'sub'
   # Apply role: approved applies (infra) and the unattended nightly destroy (infra-destroy)
   apply_role_name = "${var.project}-gha-apply"
