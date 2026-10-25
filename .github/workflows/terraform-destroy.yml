@@ -19,6 +19,7 @@ env:
   AWS_REGION: eu-west-1
   TF_IN_AUTOMATION: "true"
   LAYERS: "03_platform 02_eks 01_network" # reverse of the apply order
+  CLUSTER_NAME: myeks # live/02_eks: cluster name = project
 
 jobs:
   destroy:
@@ -44,8 +45,43 @@ jobs:
           role-duration-seconds: 3600
           mask-aws-account-id: true
 
-      # Until Argo CD deletes the apps first (next slice), stop here instead of letting
-      # terraform destroy hang on ENIs of an ALB it does not know about.
+      # Tear down in the reverse order of bring-up: the apps first, while the platform
+      # controllers (ESO, later the ALB controller and EBS CSI) are still running and can
+      # finish their own cleanup (finalizers, load balancers, volumes). Then the platform.
+      # 1. Delete the Argo CD Applications: they have no finalizer, so only the Application
+      #    objects go and Argo CD stops re-creating what we delete next.
+      # 2. Delete the namespaces they deployed into and wait until they are really gone.
+      - name: Drain the apps (cluster up only)
+        env:
+          CLUSTER: ${{ env.CLUSTER_NAME }}
+          KEEP: "argocd kube-system kube-public kube-node-lease default kyverno external-secrets"
+        run: |
+          set -euo pipefail
+          if ! aws eks describe-cluster --name "$CLUSTER" > /dev/null 2>&1; then
+            echo "No cluster: nothing to drain"; exit 0
+          fi
+          aws eks update-kubeconfig --name "$CLUSTER" --region "$AWS_REGION" > /dev/null
+          if ! kubectl get crd applications.argoproj.io > /dev/null 2>&1; then
+            echo "No Argo CD: nothing to drain"; exit 0
+          fi
+          NAMESPACES=$(kubectl get applications -n argocd \
+            -o jsonpath='{range .items[*]}{.spec.destination.namespace}{"\n"}{end}' | sort -u)
+          kubectl delete applications -n argocd --all --wait=true
+          for ns in $NAMESPACES; do
+            case " $KEEP " in *" $ns "*) continue ;; esac
+            echo "Deleting namespace $ns"
+            kubectl delete namespace "$ns" --ignore-not-found --wait=false
+          done
+          for ns in $NAMESPACES; do
+            case " $KEEP " in *" $ns "*) continue ;; esac
+            kubectl wait --for=delete "namespace/$ns" --timeout=300s || {
+              echo "::error::namespace $ns still terminating after 5 min"
+              kubectl get namespace "$ns" -o jsonpath='{.status.conditions}'; exit 1; }
+          done
+          echo "Apps drained: ${NAMESPACES//$'\n'/ }" | tee -a "$GITHUB_STEP_SUMMARY"
+
+      # Anything a controller created in AWS (load balancers, volumes) must be gone by now,
+      # or terraform destroy would hang on ENIs it does not know about
       - name: Kubernetes-created resources gone?
         run: bash scripts/leftover-check.sh k8s
 
