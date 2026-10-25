@@ -46,15 +46,15 @@ jobs:
           mask-aws-account-id: true
 
       # Tear down in the reverse order of bring-up: the apps first, while the platform
-      # controllers (ESO, later the ALB controller and EBS CSI) are still running and can
-      # finish their own cleanup (finalizers, load balancers, volumes). Then the platform.
+      # controllers (ESO, ALB controller, ExternalDNS, EBS CSI) are still running and can
+      # finish their own cleanup (finalizers, load balancers, DNS records, volumes). Then the platform.
       # 1. Delete the Argo CD Applications: they have no finalizer, so only the Application
       #    objects go and Argo CD stops re-creating what we delete next.
       # 2. Delete the namespaces they deployed into and wait until they are really gone.
       - name: Drain the apps (cluster up only)
         env:
           CLUSTER: ${{ env.CLUSTER_NAME }}
-          KEEP: "argocd kube-system kube-public kube-node-lease default kyverno external-secrets"
+          KEEP: "argocd kube-system kube-public kube-node-lease default kyverno external-secrets external-dns"
         run: |
           set -euo pipefail
           if ! aws eks describe-cluster --name "$CLUSTER" > /dev/null 2>&1; then
@@ -79,6 +79,12 @@ jobs:
               kubectl get namespace "$ns" -o jsonpath='{.status.conditions}'; exit 1; }
           done
           echo "Apps drained: ${NAMESPACES//$'\n'/ }" | tee -a "$GITHUB_STEP_SUMMARY"
+          # The ALB is gone with its Ingress (finalizer); ExternalDNS removes the DNS records on its
+          # next sync (every minute). Give it up to 3 min; the next step gives the verdict.
+          for i in $(seq 1 12); do
+            bash scripts/leftover-check.sh k8s > /dev/null 2>&1 && break
+            echo "waiting for the ALB and DNS records to go ($i/12)"; sleep 15
+          done
 
       # Anything a controller created in AWS (load balancers, volumes) must be gone by now,
       # or terraform destroy would hang on ENIs it does not know about

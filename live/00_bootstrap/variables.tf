@@ -81,6 +81,21 @@ variable "ci_applied_layers" {
   }
 }
 
+variable "hosted_zone_name" {
+  description = "Existing public Route 53 zone (created outside Terraform, shared with other projects)"
+  type        = string
+}
+
+variable "platform_domain" {
+  description = "Subdomain the platform owns inside the zone: prod = <platform_domain>, dev = dev.<platform_domain>"
+  type        = string
+
+  validation {
+    condition     = endswith(var.platform_domain, ".${var.hosted_zone_name}")
+    error_message = "platform_domain must be a subdomain of hosted_zone_name."
+  }
+}
+
 # ── Optional ──────────────────────────────────────────────────────────────────
 
 variable "tfstate_noncurrent_version_days" {

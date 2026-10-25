@@ -39,3 +39,13 @@ variable "external_secrets_chart_version" {
   description = "external-secrets Helm chart version"
   type        = string
 }
+
+variable "aws_load_balancer_controller_chart_version" {
+  description = "aws-load-balancer-controller Helm chart version (policies/aws-load-balancer-controller.json must match it)"
+  type        = string
+}
+
+variable "external_dns_chart_version" {
+  description = "external-dns Helm chart version"
+  type        = string
+}

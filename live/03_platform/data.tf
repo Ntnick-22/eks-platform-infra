@@ -11,3 +11,23 @@ data "aws_eks_cluster" "this" {
 data "aws_ssm_parameter" "gitops_deploy_key_secret_arn" {
   name = "/${var.project}/bootstrap/gitops_deploy_key_secret_arn"
 }
+
+data "aws_partition" "current" {}
+
+# Owned by other layers (ADR-0019). insecure_value: IDs and names, not secrets.
+data "aws_ssm_parameter" "vpc_id" {
+  name = "/${var.project}/network/vpc_id"
+}
+
+data "aws_ssm_parameter" "permissions_boundary_arn" {
+  name = "/${var.project}/bootstrap/permissions_boundary_arn"
+}
+
+# Public zone + platform domain (the ACM certificate for it lives in 00_bootstrap too)
+data "aws_ssm_parameter" "hosted_zone_id" {
+  name = "/${var.project}/bootstrap/hosted_zone_id"
+}
+
+data "aws_ssm_parameter" "platform_domain" {
+  name = "/${var.project}/bootstrap/platform_domain"
+}
