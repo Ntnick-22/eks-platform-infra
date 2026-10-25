@@ -1,0 +1,18 @@
+# AWS Load Balancer Controller. clusterName, region, vpcId and the service account name are set
+# in aws_load_balancer_controller.tf (they come from the other layers).
+# Dev-sized: 1 replica (a restart only pauses ALB changes; traffic keeps flowing through the ALB)
+replicaCount: 1
+
+# Pods are registered as ALB targets directly (no NodePort hop), so NetworkPolicies see the ALB
+defaultTargetType: ip
+
+# Off: it would make this controller handle every new Service of type LoadBalancer, and with
+# failurePolicy Fail no Service could be created while the controller is down. We use Ingress only.
+enableServiceMutatorWebhook: false
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 128Mi
+  limits:
+    memory: 256Mi

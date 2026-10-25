@@ -2,7 +2,7 @@
 # Finds paid resources of the daily stack that still exist.
 #
 #   scripts/leftover-check.sh k8s   before destroying 02_eks: AWS resources Kubernetes created
-#                                   (ALBs from Ingresses, EBS volumes from PVCs). Terraform does not
+#                                   (ALBs from Ingresses, their DNS records, EBS volumes from PVCs). Terraform does not
 #                                   know them, so they block the VPC delete and keep costing money.
 #   scripts/leftover-check.sh all   after the destroy: everything of the daily stack
 #
@@ -52,6 +52,18 @@ check "load balancers (AWS LB Controller)" aws resourcegroupstaggingapi get-reso
   --tag-filters "Key=elbv2.k8s.aws/cluster,Values=$CLUSTER" \
   --resource-type-filters elasticloadbalancing:loadbalancer \
   --query 'ResourceTagMappingList[].ResourceARN' --output text
+
+# Records ExternalDNS created under the platform domain (ALB aliases + owner TXT). The ACM
+# validation CNAMEs there are persistent (00_bootstrap), so CNAMEs are not counted.
+platform_dns_records() {
+  local zone domain
+  zone=$(aws ssm get-parameter --name "/$PROJECT/bootstrap/hosted_zone_id" --query Parameter.Value --output text) || return 1
+  domain=$(aws ssm get-parameter --name "/$PROJECT/bootstrap/platform_domain" --query Parameter.Value --output text) || return 1
+  aws route53 list-resource-record-sets --hosted-zone-id "$zone" \
+    --query "ResourceRecordSets[?(Name=='$domain.' || ends_with(Name, '.$domain.')) && Type!='CNAME'].[Name,Type]" \
+    --output text
+}
+check "DNS records (ExternalDNS)" platform_dns_records
 
 check "EBS volumes (EBS CSI driver)" aws ec2 describe-volumes \
   --filters "Name=tag-key,Values=kubernetes.io/cluster/$CLUSTER" \

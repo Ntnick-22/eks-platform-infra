@@ -14,4 +14,8 @@ github_apply_environment   = "infra"
 github_destroy_environment = "infra-destroy"
 ci_applied_layers          = ["01_network", "02_eks", "03_platform"]
 
+# Public DNS: the zone already exists (other projects use it too); the platform owns only eks.<zone>
+hosted_zone_name = "nt-nick.link"
+platform_domain  = "eks.nt-nick.link"
+
 # budget_alert_emails comes from TF_VAR_budget_alert_emails / GitHub secret, never from this file.

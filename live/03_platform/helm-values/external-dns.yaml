@@ -1,0 +1,20 @@
+# ExternalDNS. Domain filter, owner ID and zone come from external_dns.tf (00_bootstrap contract).
+provider:
+  name: aws
+
+# Ingress hosts only (we create no Services of type LoadBalancer)
+sources:
+  - ingress
+
+# sync = also delete records whose Ingress is gone (the nightly destroy relies on it).
+# Safe here: it only touches records with our owner ID, inside the platform domain.
+policy: sync
+registry: txt
+interval: 1m
+
+resources:
+  requests:
+    cpu: 10m
+    memory: 64Mi
+  limits:
+    memory: 128Mi
