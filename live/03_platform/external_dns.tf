@@ -55,7 +55,13 @@ resource "helm_release" "external_dns" {
       domainFilters  = [local.platform_domain]
       # Owner tag in the TXT records: it only ever deletes records this cluster created
       txtOwnerId = var.project
-      extraArgs  = ["--zone-id-filter=${local.hosted_zone_id}", "--aws-zone-type=public"]
+      # zone-match-parent: the filter is a subdomain (eks.<zone>) of the zone; without it no zone
+      # matches and ExternalDNS silently creates nothing ("record filter for domains: []")
+      extraArgs = [
+        "--zone-id-filter=${local.hosted_zone_id}",
+        "--aws-zone-type=public",
+        "--aws-zone-match-parent",
+      ]
     }),
   ]
   wait    = true
