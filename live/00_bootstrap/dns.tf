@@ -19,16 +19,19 @@ resource "aws_acm_certificate" "platform" {
   }
 }
 
-# eks.<zone> and *.eks.<zone> share one validation record: dedupe by record name
+# ACM gives eks.<zone> and *.eks.<zone> the same validation record, so one is enough.
+# Keyed by domain name: record names are only known after the certificate exists, and
+# for_each keys must be known at plan time.
 resource "aws_route53_record" "platform_cert_validation" {
   for_each = {
-    for o in aws_acm_certificate.platform.domain_validation_options : o.resource_record_name => o...
+    for o in aws_acm_certificate.platform.domain_validation_options : o.domain_name => o
+    if !startswith(o.domain_name, "*.")
   }
 
   zone_id = data.aws_route53_zone.root.zone_id
-  name    = each.key
-  type    = each.value[0].resource_record_type
-  records = [each.value[0].resource_record_value]
+  name    = each.value.resource_record_name
+  type    = each.value.resource_record_type
+  records = [each.value.resource_record_value]
   ttl     = 300
 }
 
