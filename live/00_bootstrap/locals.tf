@@ -40,13 +40,14 @@ locals {
     "service-role/AmazonEBSCSIDriverPolicy",
   ]
 
-  # Service-linked roles that EKS, node groups, Spot, ASGs and the ALB controller create on first use
+  # Service-linked roles that EKS, node groups, Spot, ASGs, the ALB controller and RDS create on first use
   service_linked_role_services = [
     "autoscaling.amazonaws.com",
     "eks.amazonaws.com",
     "eks-nodegroup.amazonaws.com",
     "spot.amazonaws.com",
     "elasticloadbalancing.amazonaws.com",
+    "rds.amazonaws.com",
   ]
 
   # ARN building blocks for the apply policy
