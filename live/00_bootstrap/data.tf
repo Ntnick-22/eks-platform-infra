@@ -133,6 +133,38 @@ data "aws_iam_policy_document" "ci_apply" {
     resources = [aws_secretsmanager_secret.gitops_deploy_key.arn]
   }
 
+  # 04_data: the prod database, its subnet group and the destroy workflow's dated snapshots.
+  # Whole service, but only on <project>-* resources (other projects' databases are untouchable).
+  statement {
+    sid     = "RdsProjectResources"
+    actions = ["rds:*"]
+    resources = [for t in ["db", "snapshot", "subgrp"] :
+    "arn:${data.aws_partition.current.partition}:rds:${var.region}:${local.account_id}:${t}:${var.project}-*"]
+  }
+
+  # Creating or restoring an instance is also authorized against the default parameter and
+  # option groups it uses (read-only use: we never change the defaults)
+  statement {
+    sid     = "RdsUseDefaultGroups"
+    actions = ["rds:CreateDBInstance", "rds:RestoreDBInstanceFromDBSnapshot", "rds:ModifyDBInstance"]
+    resources = [
+      "arn:${data.aws_partition.current.partition}:rds:${var.region}:${local.account_id}:pg:default.*",
+      "arn:${data.aws_partition.current.partition}:rds:${var.region}:${local.account_id}:og:default:*",
+    ]
+  }
+
+  # 04_data: the prod database credentials (written write-only; GetSecretValue because the
+  # provider reads the version back on refresh). Only under <project>/prod/.
+  statement {
+    sid = "SecretsProdCredentials"
+    actions = [
+      "secretsmanager:CreateSecret", "secretsmanager:DeleteSecret", "secretsmanager:UpdateSecret",
+      "secretsmanager:PutSecretValue", "secretsmanager:GetSecretValue", "secretsmanager:DescribeSecret",
+      "secretsmanager:GetResourcePolicy", "secretsmanager:TagResource", "secretsmanager:UntagResource",
+    ]
+    resources = ["arn:${data.aws_partition.current.partition}:secretsmanager:${var.region}:${local.account_id}:secret:${var.project}/prod/*"]
+  }
+
   # ── SSM contract: read every layer, write only the CI layers' own paths ──
   statement {
     sid       = "SsmContractRead"

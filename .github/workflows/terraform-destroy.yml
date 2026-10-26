@@ -18,7 +18,7 @@ env:
   TF_VERSION: "1.15.8"
   AWS_REGION: eu-west-1
   TF_IN_AUTOMATION: "true"
-  LAYERS: "03_platform 02_eks 01_network" # reverse of the apply order
+  LAYERS: "04_data 03_platform 02_eks 01_network" # reverse of the apply order
   CLUSTER_NAME: myeks # live/02_eks: cluster name = project
 
 jobs:
@@ -94,6 +94,11 @@ jobs:
       # or terraform destroy would hang on ENIs it does not know about
       - name: Kubernetes-created resources gone?
         run: bash scripts/leftover-check.sh k8s
+
+      # Prod data survives the night: dated snapshot (after the drain, so no app is writing),
+      # keep the newest 3. The next apply restores the newest. Must succeed before any destroy.
+      - name: Snapshot the prod database
+        run: bash scripts/snapshot-db.sh
 
       - name: destroy each layer in reverse order
         run: |

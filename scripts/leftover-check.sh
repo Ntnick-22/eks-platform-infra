@@ -85,7 +85,14 @@ if [ "$MODE" = "all" ]; then
   check "control plane log group" aws logs describe-log-groups \
     --log-group-name-prefix "/aws/eks/$CLUSTER/" --query 'logGroups[].logGroupName' --output text
 
-  for layer in network eks; do
+  # The dated snapshots are kept on purpose (prod data); the instance must be gone
+  check "RDS instance (04_data)" aws rds describe-db-instances \
+    --query "DBInstances[?DBInstanceIdentifier=='$PROJECT-prod'].DBInstanceIdentifier" --output text
+
+  check "prod DB secret (04_data)" aws secretsmanager list-secrets \
+    --filters "Key=name,Values=$PROJECT/prod/" --query 'SecretList[].Name' --output text
+
+  for layer in network eks data; do
     check "SSM contract /$PROJECT/$layer" aws ssm get-parameters-by-path \
       --path "/$PROJECT/$layer" --query 'Parameters[].Name' --output text
   done

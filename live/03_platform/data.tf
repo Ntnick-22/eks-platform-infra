@@ -13,6 +13,7 @@ data "aws_ssm_parameter" "gitops_deploy_key_secret_arn" {
 }
 
 data "aws_partition" "current" {}
+data "aws_caller_identity" "current" {}
 
 # Owned by other layers (ADR-0019). insecure_value: IDs and names, not secrets.
 data "aws_ssm_parameter" "vpc_id" {

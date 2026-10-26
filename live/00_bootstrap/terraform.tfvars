@@ -12,7 +12,7 @@ ecr_repositories           = ["backend", "frontend"]
 # Add a layer here when CI starts applying it.
 github_apply_environment   = "infra"
 github_destroy_environment = "infra-destroy"
-ci_applied_layers          = ["01_network", "02_eks", "03_platform"]
+ci_applied_layers          = ["01_network", "02_eks", "03_platform", "04_data"]
 
 # Public DNS: the zone already exists (other projects use it too); the platform owns only eks.<zone>
 hosted_zone_name = "nt-nick.link"

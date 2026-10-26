@@ -7,6 +7,7 @@ on:
       - "live/01_network/**"
       - "live/02_eks/**"
       - "live/03_platform/**"
+      - "live/04_data/**"
       - "modules/**"
       - ".github/workflows/terraform-apply.yml"
   workflow_dispatch: # morning bring-up: Actions → terraform-apply → Run workflow
@@ -25,7 +26,7 @@ env:
   TF_VERSION: "1.15.8"
   AWS_REGION: eu-west-1
   TF_IN_AUTOMATION: "true"
-  LAYERS: "01_network 02_eks 03_platform" # apply order; each layer reads the ones before it
+  LAYERS: "01_network 02_eks 03_platform 04_data" # apply order; each layer reads the ones before it
 
 jobs:
   apply:
@@ -55,6 +56,12 @@ jobs:
         run: |
           set -euo pipefail
           ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+
+          # 04_data restores prod from the newest nightly snapshot (empty = first run: new database).
+          # Two lines on purpose: a failed lookup inside "export VAR=$(...)" would not stop the job.
+          SNAPSHOT=$(bash scripts/latest-db-snapshot.sh)
+          export TF_VAR_restore_snapshot_identifier="$SNAPSHOT"
+          echo "Prod database restores from: ${SNAPSHOT:-nothing (new empty database)}" | tee -a "$GITHUB_STEP_SUMMARY"
 
           for layer in $LAYERS; do
             echo "::group::$layer"

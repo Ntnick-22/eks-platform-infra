@@ -37,6 +37,9 @@ jobs:
           # PR-triggered plan role gets no cluster access. The real plan runs in terraform-apply, after approval.
           - layer: 03_platform
             validate_only: true
+          # Refresh would read the prod DB secret version (GetSecretValue): the plan role cannot
+          - layer: 04_data
+            validate_only: true
     defaults:
       run:
         working-directory: live/${{ matrix.layer }}
