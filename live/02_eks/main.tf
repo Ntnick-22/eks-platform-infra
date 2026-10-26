@@ -3,6 +3,7 @@ module "eks_cluster" {
 
   name               = local.cluster_name
   kubernetes_version = var.kubernetes_version
+  addon_versions     = var.addon_versions
 
   vpc_id                   = data.aws_ssm_parameter.vpc_id.insecure_value
   control_plane_subnet_ids = local.private_app_subnet_ids

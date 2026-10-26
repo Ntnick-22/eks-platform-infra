@@ -54,6 +54,7 @@ module "eks" {
     # Before the nodes: prefix delegation must be on when the first node starts,
     # or it gets a few single IPs instead of /28 prefixes (~110 pods per node).
     vpc-cni = {
+      addon_version  = var.addon_versions["vpc-cni"]
       before_compute = true
       configuration_values = jsonencode({
         env = {
@@ -64,12 +65,14 @@ module "eks" {
       })
     }
     eks-pod-identity-agent = {
+      addon_version  = var.addon_versions["eks-pod-identity-agent"]
       before_compute = true
     }
-    kube-proxy     = {}
-    coredns        = {}
-    metrics-server = {}
+    kube-proxy     = { addon_version = var.addon_versions["kube-proxy"] }
+    coredns        = { addon_version = var.addon_versions["coredns"] }
+    metrics-server = { addon_version = var.addon_versions["metrics-server"] }
     aws-ebs-csi-driver = {
+      addon_version = var.addon_versions["aws-ebs-csi-driver"]
       # gp3 StorageClass marked default: since 1.30 EKS no longer makes gp2 the default.
       # No extra volume tags needed: the add-on runs the driver with --k8s-tag-cluster-id=<cluster>,
       # so every volume already gets kubernetes.io/cluster/<cluster>=owned (scripts/leftover-check.sh
