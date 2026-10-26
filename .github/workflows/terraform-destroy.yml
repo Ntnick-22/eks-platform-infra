@@ -48,9 +48,11 @@ jobs:
       # Tear down in the reverse order of bring-up: the apps first, while the platform
       # controllers (ESO, ALB controller, ExternalDNS, EBS CSI) are still running and can
       # finish their own cleanup (finalizers, load balancers, DNS records, volumes). Then the platform.
-      # 1. Delete the Argo CD Applications: they have no finalizer, so only the Application
-      #    objects go and Argo CD stops re-creating what we delete next.
-      # 2. Delete the namespaces they deployed into and wait until they are really gone.
+      # 1. Stop Argo CD's application controller. Deleting the Applications alone is a race:
+      #    the root app (self-heal) re-created a child it had just lost, which re-created the
+      #    namespace, the Ingress and a new ALB (2026-10-25).
+      # 2. Delete the Applications: no finalizer, so only the Application objects go.
+      # 3. Delete the namespaces they deployed into and wait until they are really gone.
       - name: Drain the apps (cluster up only)
         env:
           CLUSTER: ${{ env.CLUSTER_NAME }}
@@ -66,6 +68,8 @@ jobs:
           fi
           NAMESPACES=$(kubectl get applications -n argocd \
             -o jsonpath='{range .items[*]}{.spec.destination.namespace}{"\n"}{end}' | sort -u)
+          kubectl -n argocd scale statefulset argocd-application-controller --replicas=0
+          kubectl -n argocd rollout status statefulset argocd-application-controller --timeout=120s
           kubectl delete applications -n argocd --all --wait=true
           for ns in $NAMESPACES; do
             case " $KEEP " in *" $ns "*) continue ;; esac
