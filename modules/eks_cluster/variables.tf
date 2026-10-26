@@ -45,6 +45,17 @@ variable "permissions_boundary_arn" {
   type        = string
 }
 
+variable "addon_versions" {
+  description = "Exact EKS add-on versions (aws eks describe-addon-versions). Pinned: without a version the module installs the most recent one, so add-ons changed on any apply."
+  type        = map(string)
+
+  validation {
+    condition = alltrue([for a in ["vpc-cni", "eks-pod-identity-agent", "kube-proxy", "coredns", "metrics-server", "aws-ebs-csi-driver"] :
+    contains(keys(var.addon_versions), a)])
+    error_message = "addon_versions needs a version for every add-on: vpc-cni, eks-pod-identity-agent, kube-proxy, coredns, metrics-server, aws-ebs-csi-driver."
+  }
+}
+
 # ── Optional ──────────────────────────────────────────────────────────────────
 
 variable "node_instance_types" {

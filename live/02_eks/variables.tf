@@ -25,6 +25,11 @@ variable "cluster_admin_iam_users" {
   type        = list(string)
 }
 
+variable "addon_versions" {
+  description = "Exact EKS add-on versions, bumped by PR (aws eks describe-addon-versions --kubernetes-version <v> --addon-name <name>)"
+  type        = map(string)
+}
+
 # ── Optional ──────────────────────────────────────────────────────────────────
 
 variable "node_az_count" {
