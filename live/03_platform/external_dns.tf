@@ -7,10 +7,15 @@ data "aws_iam_policy_document" "external_dns" {
     actions   = ["route53:ChangeResourceRecordSets"]
     resources = ["arn:${data.aws_partition.current.partition}:route53:::hostedzone/${local.hosted_zone_id}"]
 
+    # The owner TXT of a record is "<type>-<first label>…": for the apex itself (prod's host)
+    # that is a-eks.<zone>, outside *.<platform_domain>, so those three names are listed exactly
     condition {
       test     = "ForAllValues:StringLike"
       variable = "route53:ChangeResourceRecordSetsNormalizedRecordNames"
-      values   = [local.platform_domain, "*.${local.platform_domain}"]
+      values = concat(
+        [local.platform_domain, "*.${local.platform_domain}"],
+        [for t in ["a", "aaaa", "cname"] : "${t}-${local.platform_domain}"],
+      )
     }
   }
 
