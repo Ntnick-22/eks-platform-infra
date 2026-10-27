@@ -103,3 +103,9 @@ variable "tfstate_noncurrent_version_days" {
   type        = number
   default     = 90
 }
+
+variable "loki_bucket_expiration_days" {
+  description = "Backstop: S3 deletes Loki objects after N days. Keep it above Loki's own retention (compactor, gitops apps/loki.yaml) so Loki always deletes first"
+  type        = number
+  default     = 10
+}
