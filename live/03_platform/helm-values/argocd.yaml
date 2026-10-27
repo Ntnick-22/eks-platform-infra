@@ -1,5 +1,42 @@
 # Argo CD day-0 values. Terraform owns Argo CD: change values or the chart version by PR.
+# global.domain, dex.config and policy.csv are added in argocd.tf (they come from other layers/tfvars).
+
+configs:
+  cm:
+    # Login only through GitHub (Dex). Break-glass = kubectl: the cluster admin can still
+    # port-forward and re-enable admin, so a broken SSO never locks us out.
+    admin.enabled: false
+  params:
+    # TLS ends at the ALB; the server speaks plain HTTP inside the VPC
+    server.insecure: true
+  rbac:
+    # A GitHub login that is not in policy.csv gets no permissions at all
+    policy.default: ""
+    # Match RBAC subjects on the GitHub login (Dex puts it in preferred_username)
+    scopes: "[preferred_username]"
+
 dex:
-  enabled: false # port-forward + admin for now; SSO later
+  enabled: true
+
 notifications:
   enabled: false
+
+# argocd.<platform_domain> on the shared ALB. The group-wide settings (scheme, listeners,
+# TLS policy, name) must match the app Ingresses in the gitops repo exactly.
+# The ACM certificate is found by host name (*.<platform_domain>).
+server:
+  ingress:
+    enabled: true
+    ingressClassName: alb
+    tls: true # only for the host list: the ALB ignores the chart's secret name
+    annotations:
+      alb.ingress.kubernetes.io/group.name: myeks
+      alb.ingress.kubernetes.io/load-balancer-name: myeks
+      alb.ingress.kubernetes.io/scheme: internet-facing
+      alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
+      alb.ingress.kubernetes.io/ssl-redirect: "443"
+      alb.ingress.kubernetes.io/ssl-policy: ELBSecurityPolicy-TLS13-1-2-2021-06
+      alb.ingress.kubernetes.io/group.order: "5"
+      alb.ingress.kubernetes.io/target-type: ip
+      alb.ingress.kubernetes.io/healthcheck-path: /healthz
+      alb.ingress.kubernetes.io/target-group-attributes: deregistration_delay.timeout_seconds=30

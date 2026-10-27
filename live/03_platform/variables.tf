@@ -35,6 +35,21 @@ variable "gitops_repo_url" {
   }
 }
 
+variable "argocd_github_client_id" {
+  description = "Client ID of the GitHub OAuth App myeks-argocd (public; its secret is in Secrets Manager)"
+  type        = string
+}
+
+variable "argocd_admins" {
+  description = "GitHub logins with role:admin in Argo CD; every other GitHub user can log in but sees nothing"
+  type        = list(string)
+
+  validation {
+    condition     = length(var.argocd_admins) > 0
+    error_message = "argocd_admins needs at least one login: the local admin account is disabled."
+  }
+}
+
 variable "external_secrets_chart_version" {
   description = "external-secrets Helm chart version"
   type        = string
