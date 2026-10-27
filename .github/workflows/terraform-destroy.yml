@@ -70,7 +70,13 @@ jobs:
             -o jsonpath='{range .items[*]}{.spec.destination.namespace}{"\n"}{end}' | sort -u)
           kubectl -n argocd scale statefulset argocd-application-controller --replicas=0
           kubectl -n argocd rollout status statefulset argocd-application-controller --timeout=120s
-          kubectl delete applications -n argocd --all --wait=true
+          # Only the controller removes Application finalizers (e.g. kyverno's pre-delete hook
+          # finalizer), and it is stopped now: drop them, or the delete waits forever.
+          # The namespaces below are deleted directly, so no cascade is lost.
+          for app in $(kubectl get applications -n argocd -o name); do
+            kubectl patch -n argocd "$app" --type=merge -p '{"metadata":{"finalizers":null}}'
+          done
+          kubectl delete applications -n argocd --all --wait=true --timeout=120s
           for ns in $NAMESPACES; do
             case " $KEEP " in *" $ns "*) continue ;; esac
             echo "Deleting namespace $ns"
