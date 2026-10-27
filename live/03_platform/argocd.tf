@@ -138,5 +138,6 @@ resource "helm_release" "argocd_root" {
     helm_release.aws_load_balancer_controller,
     helm_release.external_dns,
     module.loki_role,
+    module.alertmanager_role,
   ]
 }

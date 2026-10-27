@@ -42,3 +42,8 @@ data "aws_ssm_parameter" "platform_domain" {
 data "aws_ssm_parameter" "loki_bucket_arn" {
   name = "/${var.project}/bootstrap/loki_bucket_arn"
 }
+
+# Persistent alerts topic (00_bootstrap); Alertmanager's role may publish to it
+data "aws_ssm_parameter" "alerts_topic_arn" {
+  name = "/${var.project}/bootstrap/alerts_topic_arn"
+}

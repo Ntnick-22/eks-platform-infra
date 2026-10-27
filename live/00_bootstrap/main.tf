@@ -74,6 +74,7 @@ module "contract" {
     gitops_deploy_key_secret_arn   = aws_secretsmanager_secret.gitops_deploy_key.arn
     argocd_github_oauth_secret_arn = aws_secretsmanager_secret.argocd_github_oauth.arn
     loki_bucket_arn                = module.loki_bucket.arn
+    alerts_topic_arn               = aws_sns_topic.alerts.arn
     hosted_zone_id                 = data.aws_route53_zone.root.zone_id
     platform_domain                = var.platform_domain
     # Through the validation resource: published only once the certificate is ISSUED
