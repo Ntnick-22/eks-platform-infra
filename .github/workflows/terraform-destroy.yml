@@ -88,6 +88,9 @@ jobs:
               echo "::error::namespace $ns still terminating after 5 min"
               kubectl get namespace "$ns" -o jsonpath='{.status.conditions}'; exit 1; }
           done
+          # Argo CD's own Ingress (03_platform) also keeps the shared ALB and its DNS record alive;
+          # argocd is kept (Terraform removes it), so delete just the Ingress now
+          kubectl -n argocd delete ingress --all --ignore-not-found
           echo "Apps drained: ${NAMESPACES//$'\n'/ }" | tee -a "$GITHUB_STEP_SUMMARY"
           # The ALB is gone with its Ingress (finalizer); ExternalDNS removes the DNS records on its
           # next sync (every minute). Give it up to 3 min; the next step gives the verdict.

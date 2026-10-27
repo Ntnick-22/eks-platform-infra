@@ -125,12 +125,16 @@ data "aws_iam_policy_document" "ci_apply" {
     }
   }
 
-  # 03_platform: Argo CD's gitops deploy key, read at apply time into a write-only Secret (never in state).
-  # ReadOnlyAccess does not include GetSecretValue, so the plan role can never read it.
+  # 03_platform: Argo CD's gitops deploy key and GitHub OAuth client secret, read at apply time
+  # into write-only Secrets (never in state).
+  # ReadOnlyAccess does not include GetSecretValue, so the plan role can never read them.
   statement {
-    sid       = "ReadGitopsDeployKey"
-    actions   = ["secretsmanager:GetSecretValue"]
-    resources = [aws_secretsmanager_secret.gitops_deploy_key.arn]
+    sid     = "ReadArgocdSecrets"
+    actions = ["secretsmanager:GetSecretValue"]
+    resources = [
+      aws_secretsmanager_secret.gitops_deploy_key.arn,
+      aws_secretsmanager_secret.argocd_github_oauth.arn,
+    ]
   }
 
   # 04_data: the prod database, its subnet group and the destroy workflow's dated snapshots.

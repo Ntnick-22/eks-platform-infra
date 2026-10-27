@@ -12,6 +12,11 @@ data "aws_ssm_parameter" "gitops_deploy_key_secret_arn" {
   name = "/${var.project}/bootstrap/gitops_deploy_key_secret_arn"
 }
 
+# Same for the GitHub OAuth client secret (Argo CD login)
+data "aws_ssm_parameter" "argocd_github_oauth_secret_arn" {
+  name = "/${var.project}/bootstrap/argocd_github_oauth_secret_arn"
+}
+
 data "aws_partition" "current" {}
 data "aws_caller_identity" "current" {}
 

@@ -1,9 +1,13 @@
 locals {
   argo_helm_repo   = "https://argoproj.github.io/argo-helm"
   argocd_namespace = "argocd"
+  argocd_host      = "argocd.${local.platform_domain}"
+  # Referenced from dex.config as $<secret>:<key>; Argo CD resolves it at runtime
+  argocd_github_oauth_secret = "argocd-github-oauth"
 }
 
 # Argo CD itself. Upgrade by changing argocd_chart_version in tfvars (PR → plan → apply).
+# Static settings in the values file; what depends on other layers or tfvars is added here.
 resource "helm_release" "argocd" {
   name             = "argocd"
   namespace        = local.argocd_namespace
@@ -11,9 +15,55 @@ resource "helm_release" "argocd" {
   repository       = local.argo_helm_repo
   chart            = "argo-cd"
   version          = var.argocd_chart_version
-  values           = [file("${path.module}/helm-values/argocd.yaml")]
-  wait             = true
-  timeout          = 600
+  values = [
+    file("${path.module}/helm-values/argocd.yaml"),
+    yamlencode({
+      global = { domain = local.argocd_host } # also the login URL Dex redirects back to
+      configs = {
+        cm = {
+          "dex.config" = yamlencode({
+            connectors = [{
+              type = "github"
+              id   = "github"
+              name = "GitHub"
+              config = {
+                clientID     = var.argocd_github_client_id
+                clientSecret = format("$%s:clientSecret", local.argocd_github_oauth_secret)
+              }
+            }]
+          })
+        }
+        rbac = {
+          "policy.csv" = join("\n", [for login in var.argocd_admins : "g, ${login}, role:admin"])
+        }
+      }
+    }),
+  ]
+  wait    = true
+  timeout = 600
+}
+
+# GitHub OAuth client secret for Dex: Secrets Manager → write-only Secret, never in state.
+# Argo CD only resolves $<secret>:<key> references in Secrets labelled part-of=argocd.
+ephemeral "aws_secretsmanager_secret_version" "argocd_github_oauth" {
+  secret_id = data.aws_ssm_parameter.argocd_github_oauth_secret_arn.insecure_value
+}
+
+resource "kubernetes_secret_v1" "argocd_github_oauth" {
+  metadata {
+    name      = local.argocd_github_oauth_secret
+    namespace = local.argocd_namespace
+    labels = {
+      "app.kubernetes.io/part-of" = "argocd"
+    }
+  }
+
+  data_wo = {
+    clientSecret = ephemeral.aws_secretsmanager_secret_version.argocd_github_oauth.secret_string
+  }
+  data_wo_revision = 1
+
+  depends_on = [helm_release.argocd] # the chart creates the argocd namespace
 }
 
 # Private gitops repo: the read-only deploy key goes from Secrets Manager straight into a

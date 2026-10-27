@@ -7,3 +7,11 @@ resource "aws_secretsmanager_secret" "gitops_deploy_key" {
   description             = "SSH private key of the read-only deploy key on eks-platform-gitops (Argo CD)"
   recovery_window_in_days = 7
 }
+
+# Client secret of the GitHub OAuth App "myeks-argocd" (Argo CD login via Dex). Same pattern:
+# empty container, value put in once by CLI, read by 03_platform into a write-only Secret.
+resource "aws_secretsmanager_secret" "argocd_github_oauth" {
+  name                    = "${var.project}/argocd/github-oauth-client-secret"
+  description             = "Client secret of the GitHub OAuth App myeks-argocd (Argo CD SSO via Dex)"
+  recovery_window_in_days = 7
+}

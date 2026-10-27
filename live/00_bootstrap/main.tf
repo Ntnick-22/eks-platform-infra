@@ -59,11 +59,12 @@ module "contract" {
   path        = "/${var.project}/bootstrap"
   description = "Published by live/00_bootstrap"
   values = {
-    permissions_boundary_arn     = module.permissions_boundary.arn
-    ci_apply_role_arn            = module.gha_apply_role.arn
-    gitops_deploy_key_secret_arn = aws_secretsmanager_secret.gitops_deploy_key.arn
-    hosted_zone_id               = data.aws_route53_zone.root.zone_id
-    platform_domain              = var.platform_domain
+    permissions_boundary_arn       = module.permissions_boundary.arn
+    ci_apply_role_arn              = module.gha_apply_role.arn
+    gitops_deploy_key_secret_arn   = aws_secretsmanager_secret.gitops_deploy_key.arn
+    argocd_github_oauth_secret_arn = aws_secretsmanager_secret.argocd_github_oauth.arn
+    hosted_zone_id                 = data.aws_route53_zone.root.zone_id
+    platform_domain                = var.platform_domain
     # Through the validation resource: published only once the certificate is ISSUED
     platform_certificate_arn = aws_acm_certificate_validation.platform.certificate_arn
   }
