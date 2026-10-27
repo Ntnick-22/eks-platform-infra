@@ -131,9 +131,12 @@ resource "helm_release" "argocd_root" {
   # Root can only sync once the repo credential exists. The ingress add-ons come first so the apps'
   # Ingresses are served at once, and on destroy they are removed last: they still clean up the
   # ALB and DNS records of the apps the destroy workflow drains before.
+  # Pod Identity credentials are injected only when a pod is created: the associations of
+  # Argo-deployed apps must exist before root syncs them, or their first pods run without.
   depends_on = [
     kubernetes_secret_v1.gitops_repo,
     helm_release.aws_load_balancer_controller,
     helm_release.external_dns,
+    module.loki_role,
   ]
 }
