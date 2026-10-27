@@ -50,7 +50,8 @@ jobs:
       # finish their own cleanup (finalizers, load balancers, DNS records, volumes). Then the platform.
       # 1. Stop Argo CD's application controller. Deleting the Applications alone is a race:
       #    the root app (self-heal) re-created a child it had just lost, which re-created the
-      #    namespace, the Ingress and a new ALB (2026-10-25).
+      #    namespace, the Ingress and a new ALB (2026-10-25). Same for the ApplicationSet
+      #    controller: it re-creates every Application it generates as soon as it is deleted.
       # 2. Delete the Applications: no finalizer, so only the Application objects go.
       # 3. Delete the namespaces they deployed into and wait until they are really gone.
       - name: Drain the apps (cluster up only)
@@ -70,6 +71,10 @@ jobs:
             -o jsonpath='{range .items[*]}{.spec.destination.namespace}{"\n"}{end}' | sort -u)
           kubectl -n argocd scale statefulset argocd-application-controller --replicas=0
           kubectl -n argocd rollout status statefulset argocd-application-controller --timeout=120s
+          kubectl -n argocd scale deployment argocd-applicationset-controller --replicas=0
+          # A Deployment at 0 reports "rolled out" while its pod is still terminating: wait for the pod
+          kubectl -n argocd wait --for=delete pod \
+            -l app.kubernetes.io/name=argocd-applicationset-controller --timeout=120s
           # Only the controller removes Application finalizers (e.g. kyverno's pre-delete hook
           # finalizer), and it is stopped now: drop them, or the delete waits forever.
           # The namespaces below are deleted directly, so no cascade is lost.
