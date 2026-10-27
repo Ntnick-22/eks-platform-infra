@@ -13,6 +13,16 @@ module "tfstate_bucket" {
   noncurrent_version_expiration_days = var.tfstate_noncurrent_version_days
 }
 
+# Loki's log storage (chunks + index). Persistent like the state bucket: logs survive the
+# nightly destroy for a few days. No versioning: Loki rewrites and deletes its own objects.
+module "loki_bucket" {
+  source = "../../modules/s3_bucket_secure"
+
+  bucket_name        = local.loki_bucket_name
+  versioning_enabled = false
+  expiration_days    = var.loki_bucket_expiration_days
+}
+
 module "gha_plan_role" {
   source = "../../modules/github_oidc_role"
 
@@ -63,6 +73,7 @@ module "contract" {
     ci_apply_role_arn              = module.gha_apply_role.arn
     gitops_deploy_key_secret_arn   = aws_secretsmanager_secret.gitops_deploy_key.arn
     argocd_github_oauth_secret_arn = aws_secretsmanager_secret.argocd_github_oauth.arn
+    loki_bucket_arn                = module.loki_bucket.arn
     hosted_zone_id                 = data.aws_route53_zone.root.zone_id
     platform_domain                = var.platform_domain
     # Through the validation resource: published only once the certificate is ISSUED

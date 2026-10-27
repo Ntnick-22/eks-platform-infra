@@ -37,3 +37,8 @@ data "aws_ssm_parameter" "hosted_zone_id" {
 data "aws_ssm_parameter" "platform_domain" {
   name = "/${var.project}/bootstrap/platform_domain"
 }
+
+# Persistent log bucket (00_bootstrap); Loki's role is scoped to it
+data "aws_ssm_parameter" "loki_bucket_arn" {
+  name = "/${var.project}/bootstrap/loki_bucket_arn"
+}
