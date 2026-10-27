@@ -15,3 +15,12 @@ resource "aws_secretsmanager_secret" "argocd_github_oauth" {
   description             = "Client secret of the GitHub OAuth App myeks-argocd (Argo CD SSO via Dex)"
   recovery_window_in_days = 7
 }
+
+# Client secret of the GitHub OAuth App "myeks-grafana". Same pattern, but Grafana is deployed
+# by Argo CD: External Secrets pulls it into the monitoring namespace (ESO may read
+# <project>/monitoring/*, see 03_platform), so neither Terraform nor CI ever reads it.
+resource "aws_secretsmanager_secret" "grafana_github_oauth" {
+  name                    = "${var.project}/monitoring/grafana-github-oauth"
+  description             = "Client secret of the GitHub OAuth App myeks-grafana (Grafana login)"
+  recovery_window_in_days = 7
+}

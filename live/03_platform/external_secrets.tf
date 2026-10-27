@@ -1,12 +1,14 @@
 # External Secrets Operator. dev: in-cluster Password generator (postgres-dev credentials).
 # prod: reads AWS (ClusterSecretStores in gitops) through its own Pod Identity role.
-# Read-only, and only what the platform publishes for the apps: secrets under <project>/prod/
-# (04_data writes the database credentials there) and the 04_data SSM contract (db_host).
+# Read-only, and only what the platform publishes for in-cluster use: secrets under
+# <project>/prod/ (04_data writes the database credentials there), <project>/monitoring/
+# (Grafana's GitHub OAuth secret, 00_bootstrap) and the 04_data SSM contract (db_host).
 data "aws_iam_policy_document" "external_secrets" {
   statement {
-    sid       = "ReadProdSecrets"
-    actions   = ["secretsmanager:GetSecretValue", "secretsmanager:DescribeSecret"]
-    resources = ["arn:${data.aws_partition.current.partition}:secretsmanager:${var.region}:${data.aws_caller_identity.current.account_id}:secret:${var.project}/prod/*"]
+    sid     = "ReadPlatformSecrets"
+    actions = ["secretsmanager:GetSecretValue", "secretsmanager:DescribeSecret"]
+    resources = [for prefix in ["prod", "monitoring"] :
+    "arn:${data.aws_partition.current.partition}:secretsmanager:${var.region}:${data.aws_caller_identity.current.account_id}:secret:${var.project}/${prefix}/*"]
   }
 
   statement {
