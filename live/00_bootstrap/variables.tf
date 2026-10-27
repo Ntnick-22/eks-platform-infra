@@ -26,7 +26,7 @@ variable "budget_limit_usd" {
 }
 
 variable "budget_alert_emails" {
-  description = "Budget alert recipients. Set via TF_VAR_budget_alert_emails (laptop) or the BUDGET_ALERT_EMAILS GitHub secret (CI); never in tfvars."
+  description = "Budget and platform alert (SNS) recipients. Set via TF_VAR_budget_alert_emails (laptop) or the BUDGET_ALERT_EMAILS GitHub secret (CI); never in tfvars."
   type        = list(string)
   sensitive   = true
 }

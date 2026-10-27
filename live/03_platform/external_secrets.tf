@@ -2,7 +2,8 @@
 # prod: reads AWS (ClusterSecretStores in gitops) through its own Pod Identity role.
 # Read-only, and only what the platform publishes for in-cluster use: secrets under
 # <project>/prod/ (04_data writes the database credentials there), <project>/monitoring/
-# (Grafana's GitHub OAuth secret, 00_bootstrap) and the 04_data SSM contract (db_host).
+# (Grafana's GitHub OAuth secret, 00_bootstrap), the 04_data SSM contract (db_host) and
+# the alerts topic ARN (Alertmanager's config is built from it: no account ID in git).
 data "aws_iam_policy_document" "external_secrets" {
   statement {
     sid     = "ReadPlatformSecrets"
@@ -12,9 +13,12 @@ data "aws_iam_policy_document" "external_secrets" {
   }
 
   statement {
-    sid       = "ReadDataContract"
-    actions   = ["ssm:GetParameter", "ssm:GetParameters"]
-    resources = ["arn:${data.aws_partition.current.partition}:ssm:${var.region}:${data.aws_caller_identity.current.account_id}:parameter/${var.project}/data/*"]
+    sid     = "ReadContractValues"
+    actions = ["ssm:GetParameter", "ssm:GetParameters"]
+    resources = [
+      "arn:${data.aws_partition.current.partition}:ssm:${var.region}:${data.aws_caller_identity.current.account_id}:parameter/${var.project}/data/*",
+      "arn:${data.aws_partition.current.partition}:ssm:${var.region}:${data.aws_caller_identity.current.account_id}:parameter/${var.project}/bootstrap/alerts_topic_arn",
+    ]
   }
 }
 
