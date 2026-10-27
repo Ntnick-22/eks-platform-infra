@@ -1,2 +1,6 @@
-# Shell scripts keep LF line endings on every OS: with CRLF, bash fails with "command not found"
+# Every text file is stored with LF line endings, whatever the editor or OS writes
+# (Windows editors save CRLF; without this, one saved file turns into a whole-file diff).
+* text=auto eol=lf
+
+# Shell scripts always as text, never auto-detected: with CRLF, bash fails with "command not found"
 *.sh text eol=lf
