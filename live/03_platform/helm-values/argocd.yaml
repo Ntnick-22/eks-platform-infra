@@ -40,3 +40,15 @@ server:
       alb.ingress.kubernetes.io/target-type: ip
       alb.ingress.kubernetes.io/healthcheck-path: /healthz
       alb.ingress.kubernetes.io/target-group-attributes: deregistration_delay.timeout_seconds=30
+
+  # UI extensions, downloaded into the server pod at start by an init container (the
+  # argocd-extension-installer). Rollouts: canary steps, weights and analysis on a Rollout's
+  # page in the Argo CD UI, so no separate Rollouts dashboard (and no extra hostname).
+  # UI-only: no proxy to a backend, so no extra RBAC.
+  extensions:
+    enabled: true
+    extensionList:
+      - name: rollout-extension
+        env:
+          - name: EXTENSION_URL
+            value: https://github.com/argoproj-labs/rollout-extension/releases/download/v0.4.1/extension.tar
