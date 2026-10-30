@@ -139,5 +139,6 @@ resource "helm_release" "argocd_root" {
     helm_release.external_dns,
     module.loki_role,
     module.alertmanager_role,
+    module.argo_rollouts_role,
   ]
 }
